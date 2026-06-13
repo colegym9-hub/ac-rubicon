@@ -15,7 +15,7 @@ const surfaces: Surface[] = [
     eyebrow: "01",
     title: "Projects / Tasks",
     body: "Priority-weighted tasks, projects by category, a one-off Inbox.",
-    ready: false,
+    ready: true,
   },
   {
     href: "/today",
