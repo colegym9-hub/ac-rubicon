@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────
+   A.C. Rubiocron — design tokens
+   Source: held plan §4 (CRM brief tokens) +
+   §5 §2 (Rubiocron-only glass + pill tokens).
+   ───────────────────────────────────────────── */
+
+@theme inline {
+  /* Surfaces */
+  --color-background: oklch(0 0 0);
+  --color-foreground: oklch(1 0 0);
+  --color-card: oklch(0.1579 0.0017 196.99);
+  --color-card-foreground: oklch(1 0 0);
+  --color-popover: oklch(0 0 0);
+  --color-popover-foreground: oklch(1 0 0);
+
+  /* Brand teal */
+  --color-primary: oklch(0.7454 0.0597 204.2423);
+  --color-primary-foreground: oklch(0 0 0);
+  --color-secondary: oklch(0.7454 0.0597 204.2423);
+  --color-secondary-foreground: oklch(0 0 0);
+
+  /* Greys + interactions */
+  --color-muted: oklch(0.18 0 0);
+  --color-muted-foreground: oklch(0.7 0 0);
+  --color-accent: oklch(0.4802 0.0648 206.7078);
+  --color-accent-foreground: oklch(1 0 0);
+  --color-destructive: oklch(0.637 0.237 25.331);
+  --color-destructive-foreground: oklch(0 0 0);
+  --color-border: oklch(0.26 0 0);
+  --color-input: oklch(0.32 0 0);
+  --color-ring: oklch(0.7454 0.0597 204.2423);
+
+  --radius: 4px;
+
+  /* Fonts (set in src/app/layout.tsx via next/font) */
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-source-serif);
+  --font-mono: var(--font-geist-mono);
+  --font-signature: var(--font-caveat);
+}
+
+/* Rubiocron-only: glass + pill states (not in CRM brief) */
+:root {
+  --glass: oklch(0.1579 0.0017 196.99 / 0.72);
+  --glass-border: oklch(1 0 0 / 0.15);
+  --glass-ring: oklch(1 0 0 / 0.08);
+  --backdrop-blur: 16px;
+  --backdrop-blur-strong: 24px;
+
+  --pill-idle: oklch(1 0 0 / 0.45);
+  --pill-active: oklch(0.7454 0.0597 204.2423);
+  --pill-bg: oklch(0.1579 0.0017 196.99 / 0.85);
+}
+
+/* Reduced motion override (per §7 motion rules) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+html,
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The signature accent move from §3 — italic Source Serif 4 in teal */
+.accent {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--color-primary);
+}
