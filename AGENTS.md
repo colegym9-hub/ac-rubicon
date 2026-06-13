@@ -38,10 +38,12 @@ Supabase + Vercel are driven via their **connected MCP servers** (provision proj
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=     # edge functions only
-ANTHROPIC_API_KEY=             # scheduler/coach edge functions
-NTFY_TOPIC=                    # phone push for the daily plan
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # unused under the server-side service-role model; never reference in a `use client` file
+SUPABASE_SERVICE_ROLE_KEY=       # all DB access (server actions + edge functions)
+APP_PASSWORD=                    # single-user password gate
+SESSION_SECRET=                  # signs the session cookie (e.g. `openssl rand -base64 32`)
+ANTHROPIC_API_KEY=               # scheduler/coach edge functions (M2+)
+NTFY_TOPIC=                      # phone push for the daily plan (M2+)
 ```
 
 Google Calendar + WHOOP are reached via their connected MCP servers (no keys in code for v1).
