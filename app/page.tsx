@@ -22,7 +22,7 @@ const surfaces: Surface[] = [
     eyebrow: "02",
     title: "Today / Scheduler",
     body: "An AI-planned, time-blocked day — on your phone before your desk.",
-    ready: false,
+    ready: true,
   },
   {
     href: "/tracking",

@@ -28,7 +28,12 @@
 
 ## Backlog (break down with @planner / @task-writer when reached)
 
-- [ ] **M2 — Today / Scheduler:** nightly Supabase edge function → Claude plan from tasks + Google Calendar (MCP) + WHOOP (MCP) + last night's recap + command-center context → write Google Calendar + ntfy push; phone-adjustable Today view; "re-plan from now"; evening recap box → `daily_logs`.
+- **M2 — Today / Scheduler** (in progress):
+  - [x] Today view shell: date + greeting, "Do Next" hero, manually-editable time-block timeline (add/check-off/remove), scheduled-for-today task list, evening recap box → `daily_logs`. Built + rendered (200). `daily_plans`/`daily_logs` data layer + upsert actions done.
+  - [ ] **NEEDS ME (architecture fork) — the AI scheduler.** PLAN says "nightly Supabase **edge function** → Claude + Calendar(MCP) + WHOOP(MCP) → plan + ntfy push." Problem: a deployed Supabase edge function **cannot reach the connected MCP servers** (they're attached to the Claude Code session, not Supabase). Decide the runtime — see NEEDS ME. Needs `ANTHROPIC_API_KEY` + `NTFY_TOPIC`.
+  - [ ] WHOOP recovery chip + Calendar next-event on the Today view (depends on the same runtime decision).
+  - [ ] "Re-plan from now" (depends on the scheduler existing).
+  - [ ] Timezone: `todayISO()` uses server-local date — store Cole's TZ before the nightly job relies on "today".
 - [ ] **M3 — Tracking logger:** one-tap metrics + expand-to-notes + add-a-metric (`tracking_metrics` / `tracking_entries`).
 - [ ] **M4 — Graphs:** task throughput, tracking trends (e.g. mood vs WHOOP recovery), plan-adherence chart.
 - [ ] Later (out of v1 scope): M5 phone capture · M6 brain→scheduler · M7 coach · M8 native iOS app.
@@ -45,6 +50,11 @@
   - **DECISION 2026-06-13:** Cole wants to provision under a **`cole-personal`** org. BUT that org is **NOT reachable** by the connected Supabase MCP — `list_organizations` (authed as `supabase@caius.org`) returns only **A.C Media**. **ACTION (Cole):** in your Claude client, reconnect the Supabase MCP integration under the account that owns `cole-personal` (likely `colegym9@gmail.com`). Once it appears in `list_organizations`, I create `ac-rubicon` there (its own free-project quota) and proceed. No code change needed on my side.
 - [ ] **NEEDS ME: confirm secret env values** (I left them as placeholders in `.env.local`; I never write real secrets). After provisioning you'll add: `SUPABASE_SERVICE_ROLE_KEY` (Supabase dashboard → Settings → API), `APP_PASSWORD` (your chosen gate password), `SESSION_SECRET` (any long random string — `openssl rand -base64 32`). `ANTHROPIC_API_KEY` + `NTFY_TOPIC` are M2, not needed yet. See `.env.local` comments.
 - [ ] **NEEDS ME: GitHub (you chose "set up, leave push to me").** No `gh`/remote available to me. When ready: create an empty private repo `ac-rubicon` on GitHub, then run the one-liner I'll leave in the final summary to push `feature/m0-foundation`.
+- [ ] **NEEDS ME (M2 architecture fork): where does the nightly AI scheduler run?** A deployed Supabase edge function can't call the connected WHOOP/Calendar MCP servers. Options:
+  1. **Claude Code scheduled routine** (the `schedule` skill / cron) running on your machine or the cloud agent — MCPs ARE available here, so it can read Calendar + WHOOP via MCP, call Claude, write `daily_plans`, and push via ntfy. Closest to the original plan, least new integration. *Recommended.*
+  2. **Supabase edge function** with **direct REST integrations** (Google Calendar API + WHOOP API OAuth tokens stored as secrets, + Anthropic API). More setup + secret management; no MCPs.
+  3. **Next.js route + Vercel Cron** — similar to (2), also needs direct API integrations.
+  Pick one and I'll build it. All need `ANTHROPIC_API_KEY` (+ `NTFY_TOPIC` for push); options 2/3 also need Google/WHOOP API credentials.
 - [ ] **NEEDS ME: confirm auth/RLS model.** I implemented the secure default for a password-gated app: **all DB access server-side via the service-role key; RLS enabled deny-by-default (no anon access).** The browser never holds a Supabase client. Confirm this, or say if you'd rather use the public anon key client-side (simpler to test, less secure — not recommended).
 
 ---
