@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { Check } from "lucide-react";
 import type { DayBlock, BlockKind } from "@/lib/day";
 
 const KIND: Record<BlockKind, { bg: string; border: string; text: string; bar: string }> = {
@@ -20,12 +21,14 @@ interface Props {
   width: string;
   isDragging: boolean;
   onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onToggleDone?: (id: string) => void;
 }
 
-export default function BlockChip({ block, top, height, left, width, isDragging, onPointerDown }: Props) {
+export default function BlockChip({ block, top, height, left, width, isDragging, onPointerDown, onToggleDone }: Props) {
   const s = KIND[block.kind] ?? KIND.buffer;
   const showLabel = height >= 26;
   const showTime  = height >= 44;
+  const showCheck = !!onToggleDone && showLabel;
 
   return (
     <div
@@ -46,7 +49,26 @@ export default function BlockChip({ block, top, height, left, width, isDragging,
       {/* Left accent bar */}
       <div className={`absolute inset-y-0 left-0 w-[3px] ${s.bar}`} />
 
-      <div className="pl-1">
+      {/* Check-off — tap toggles done without starting a drag/edit */}
+      {showCheck && (
+        <button
+          type="button"
+          aria-label={block.done ? "Mark not done" : "Mark done"}
+          aria-pressed={block.done}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onToggleDone!(block.id); }}
+          className={[
+            "absolute right-1 top-1 z-20 flex h-4 w-4 items-center justify-center rounded-full border transition-colors",
+            block.done
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-muted-foreground/40 text-transparent hover:border-foreground",
+          ].join(" ")}
+        >
+          <Check className="h-2.5 w-2.5" strokeWidth={3} />
+        </button>
+      )}
+
+      <div className={showCheck ? "pl-1 pr-5" : "pl-1"}>
         {showLabel && (
           <p className={`truncate text-[0.65rem] font-bold leading-tight ${s.text} ${block.done ? "line-through opacity-60" : ""}`}>
             {block.label}

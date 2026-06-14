@@ -345,6 +345,10 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
     setSheet({ open: false });
   }
 
+  function toggleDone(id: string) {
+    persist(blocks.map(b => b.id === id ? { ...b, done: !b.done } : b));
+  }
+
   // ── month picker ──────────────────────────────────────────────────────────────
   const mcD    = new Date(`${monthCursor}T00:00:00`);
   const mcLabel = `${MONTH_FULL[mcD.getMonth()]} ${mcD.getFullYear()}`;
@@ -554,6 +558,7 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
                 width={  `calc((${availW}) / ${block.cols})`}
                 isDragging={!!dv}
                 onPointerDown={(e) => onBlockPointerDown(e, block)}
+                onToggleDone={toggleDone}
               />
             );
           })}

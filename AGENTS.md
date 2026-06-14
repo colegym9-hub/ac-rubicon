@@ -51,8 +51,14 @@ SESSION_SECRET=                  # signs the session cookie (e.g. `openssl rand 
 MCP_BEARER_TOKEN=                # auth for the app MCP server at /api/[transport]; routines call in with it
 SUPADATA_API_KEY=                # transcripts: YouTube / Instagram / TikTok / X / Facebook / file URLs (free tier)
 DEEPGRAM_API_KEY=                # voice-memo transcription (free tier)
-BRAIN_ROUTINE_TOKEN=             # bearer for firing the brain cloud routine from the app
-BRAIN_ROUTINE_FIRE_URL=          # the brain routine's "Call via API" fire URL
+# Brain cloud routines — one "Call via API" routine each (Cole creates + wires post-deploy).
+# fireRoutine(key) reads BRAIN_<KEY>_FIRE_URL + BRAIN_<KEY>_TOKEN; unset = no-op (queue row persists).
+BRAIN_PROCESS_FIRE_URL=          # process-brain routine (convert + ingest captures)
+BRAIN_PROCESS_TOKEN=
+BRAIN_CHAT_FIRE_URL=             # brain-chat routine (answer a queued question)
+BRAIN_CHAT_TOKEN=
+BRAIN_REPLAN_FIRE_URL=           # replan-day routine (two-question re-plan)
+BRAIN_REPLAN_TOKEN=
 ```
 
 **NOT used:** `ANTHROPIC_API_KEY` / `NTFY_TOPIC` — all AI runs as Claude Code routines on Cole's

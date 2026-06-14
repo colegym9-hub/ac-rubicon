@@ -58,12 +58,15 @@ export async function writeDayPlan(
   return error ? { error: error.message } : {};
 }
 
-export async function writeRecap(input: {
-  recap?: string;
-  energy?: number | null;
-  slotsDone?: number | null;
-  slotsSlipped?: string;
-}): Promise<MutationResult> {
+export async function writeRecap(
+  input: {
+    recap?: string;
+    energy?: number | null;
+    slotsDone?: number | null;
+    slotsSlipped?: string;
+  },
+  date?: string, // defaults to today; pass an ISO date to log a past day (morning check-in)
+): Promise<MutationResult> {
   const energy =
     input.energy == null
       ? null
@@ -76,7 +79,7 @@ export async function writeRecap(input: {
   const supabase = createServiceClient();
   const { error } = await supabase.from("daily_logs").upsert(
     {
-      date: todayISO(),
+      date: date ?? todayISO(),
       recap_text: input.recap?.trim() || null,
       energy,
       slots_done: slotsDone,
@@ -85,6 +88,25 @@ export async function writeRecap(input: {
     { onConflict: "date" },
   );
   return error ? { error: error.message } : {};
+}
+
+/** Queue a "re-plan from now" request for the brain routine to act on.
+ *  Returns the new row id so the UI can poll it. */
+export async function writeReplanRequest(input: {
+  whatChanged?: string | null;
+  timeLeft?: string | null;
+}): Promise<MutationResult & { id?: string }> {
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("replan_requests")
+    .insert({
+      plan_date: todayISO(),
+      what_changed: input.whatChanged?.trim() || null,
+      time_left: input.timeLeft?.trim() || null,
+    })
+    .select("id")
+    .single();
+  return error ? { error: error.message } : { id: data.id };
 }
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────

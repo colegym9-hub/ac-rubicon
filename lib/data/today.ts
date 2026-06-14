@@ -67,3 +67,21 @@ export async function getToday(): Promise<Today> {
     scheduledTasks: tasksRes.data ?? [],
   };
 }
+
+/** Yesterday's log + its date — drives the morning check-in (fill it out if
+ *  null, review it if present). */
+export async function getYesterdayLog(): Promise<{ date: string; log: DailyLog | null }> {
+  const d = new Date(`${todayISO()}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  const date = d.toISOString().slice(0, 10);
+  if (!isSupabaseConfigured()) return { date, log: null };
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("daily_logs")
+    .select("*")
+    .eq("date", date)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return { date, log: data ?? null };
+}

@@ -1,13 +1,18 @@
 import Link from "next/link";
-import { getToday } from "@/lib/data/today";
+import { getToday, getYesterdayLog } from "@/lib/data/today";
 import { partOfDay } from "@/lib/day";
 import CalendarView from "@/components/today/CalendarView";
 import RecapSheet from "@/components/today/RecapSheet";
+import MorningCheckIn from "@/components/today/MorningCheckIn";
+import ReplanSheet from "@/components/today/ReplanSheet";
 
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const { configured, date, blocks, log } = await getToday();
+  const [{ configured, date, blocks, log }, yesterday] = await Promise.all([
+    getToday(),
+    getYesterdayLog(),
+  ]);
   const pretty = new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
     weekday: "long",
     month: "short",
@@ -26,12 +31,15 @@ export default async function TodayPage() {
             {partOfDay()}. <span className="accent">Here&apos;s the day.</span>
           </h1>
         </div>
-        <Link
-          href="/"
-          className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-primary"
-        >
-          home
-        </Link>
+        <div className="flex items-center gap-2">
+          {configured && <ReplanSheet />}
+          <Link
+            href="/home"
+            className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-primary"
+          >
+            home
+          </Link>
+        </div>
       </header>
 
       {!configured && (
@@ -53,6 +61,9 @@ export default async function TodayPage() {
           <RecapSheet log={log} />
         </div>
       </div>
+
+      {/* Morning check-in — fixed overlay, shows once per local day */}
+      {configured && <MorningCheckIn yesterday={yesterday.date} yesterdayLog={yesterday.log} />}
     </main>
   );
 }
