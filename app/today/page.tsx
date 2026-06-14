@@ -15,9 +15,9 @@ export default async function TodayPage() {
   });
 
   return (
-    <main className="mx-auto flex h-dvh w-full max-w-md flex-col">
+    <main className="mx-auto flex h-dvh w-full max-w-md md:max-w-none flex-col">
       {/* ── Fixed header ─────────────────────────────────────────────────── */}
-      <header className="shrink-0 px-5 pt-8 pb-2 flex items-center justify-between">
+      <header className="shrink-0 px-5 md:px-10 pt-8 pb-2 flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {pretty}
@@ -44,14 +44,14 @@ export default async function TodayPage() {
         </div>
       )}
 
-      {/* ── Calendar (fills remaining height) ───────────────────────────── */}
-      <div className="min-h-0 flex-1 px-2 pb-1">
-        <CalendarView initialDate={date} initialBlocks={blocks} />
-      </div>
-
-      {/* ── Log card + sheet (above bottom nav) ─────────────────────────── */}
-      <div className="shrink-0 pb-20">
-        <RecapSheet log={log} />
+      {/* ── Content: stacked on mobile, side-by-side on desktop ─────────── */}
+      <div className="min-h-0 flex-1 flex flex-col md:flex-row md:gap-4 md:px-6 md:pb-8">
+        <div className="min-h-0 flex-1 px-2 md:px-0 pb-1">
+          <CalendarView initialDate={date} initialBlocks={blocks} />
+        </div>
+        <div className="shrink-0 pb-20 md:pb-0 md:w-72 md:flex md:flex-col md:justify-end">
+          <RecapSheet log={log} />
+        </div>
       </div>
     </main>
   );

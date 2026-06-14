@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Source_Serif_4, Geist_Mono, Caveat } from "next/font/google";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
+import SideNav from "@/components/SideNav";
 import CommandPalette from "@/components/command/CommandPalette";
 
 const inter = Inter({
@@ -58,7 +59,10 @@ export default function RootLayout({
       className={`${inter.variable} ${sourceSerif.variable} ${geistMono.variable} ${caveat.variable}`}
     >
       <body>
-        {children}
+        <SideNav />
+        <div className="md:pl-52">
+          {children}
+        </div>
         <BottomNav />
         <CommandPalette />
       </body>

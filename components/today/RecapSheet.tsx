@@ -232,7 +232,7 @@ export default function RecapSheet({ log }: Props) {
       {/* ── Backdrop ─────────────────────────────────────────────────────── */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 md:left-52 z-30 bg-black/50 backdrop-blur-sm"
           onClick={() => { setSheetState("closed"); setEditing(false); }}
         />
       )}
@@ -240,7 +240,7 @@ export default function RecapSheet({ log }: Props) {
       {/* ── Sheet ────────────────────────────────────────────────────────── */}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-40 flex flex-col overflow-hidden rounded-t-2xl border-t bg-card shadow-2xl",
+          "fixed left-0 md:left-52 right-0 bottom-0 z-40 flex flex-col overflow-hidden rounded-t-2xl border-t bg-card shadow-2xl",
           "transition-[height,transform] duration-300 ease-out",
           isOpen ? "translate-y-0" : "translate-y-full",
         )}

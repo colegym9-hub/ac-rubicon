@@ -12,7 +12,7 @@ export default async function ProjectsPage() {
   const totalProjects = columns.reduce((n, c) => n + c.projects.length, 0);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-5 pt-10 pb-24">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md md:max-w-none flex-col gap-5 px-5 md:px-10 pt-10 pb-24 md:pb-10">
       <header className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">

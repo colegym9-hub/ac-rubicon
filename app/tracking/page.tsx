@@ -9,7 +9,7 @@ export default async function TrackingPage() {
   const { configured, metrics } = await getTracking();
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-5 pt-10 pb-24">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md md:max-w-none flex-col gap-6 px-5 md:px-10 pt-10 pb-24 md:pb-10">
       <header className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -39,7 +39,7 @@ export default async function TrackingPage() {
       ) : null}
 
       {metrics.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {metrics.map((metric) => (
             <MetricTile key={metric.id} metric={metric} />
           ))}

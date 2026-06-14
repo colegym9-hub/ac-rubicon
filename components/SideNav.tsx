@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { logout } from "@/app/login/actions";
 
 const ICON_PROPS = {
-  width: 22,
-  height: 22,
+  width: 20,
+  height: 20,
   viewBox: "0 0 24 24",
   fill: "none",
   stroke: "currentColor",
@@ -68,36 +69,69 @@ const TABS = [
   { href: "/graphs", label: "Graphs", Icon: GraphIcon },
 ];
 
-export default function BottomNav() {
+export default function SideNav() {
   const pathname = usePathname();
   if (pathname === "/login") return null;
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t backdrop-blur-xl md:hidden"
+      className="hidden md:flex md:fixed md:inset-y-0 md:left-0 md:z-50 md:w-52 md:flex-col md:border-r md:backdrop-blur-xl"
       style={{
         borderColor: "var(--glass-border)",
         background: "var(--glass)",
-        paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
-      <div className="mx-auto flex w-full max-w-md items-stretch justify-around px-2">
+      {/* Brand */}
+      <div className="px-5 pt-8 pb-6">
+        <span className="font-mono text-[0.55rem] uppercase tracking-[0.3em] text-muted-foreground">
+          AC
+        </span>
+        <h1 className="text-xl font-extrabold leading-tight tracking-tight">
+          Rubicon
+        </h1>
+      </div>
+
+      <div
+        className="mx-4 mb-4 h-px"
+        style={{ background: "var(--glass-border)" }}
+      />
+
+      {/* Nav items */}
+      <div className="flex flex-1 flex-col gap-1 px-3">
         {TABS.map(({ href, label, Icon }) => {
           const active =
-            pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}`));
+            pathname === href ||
+            (href !== "/dashboard" && pathname.startsWith(`${href}`));
           return (
             <Link
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className="flex flex-1 flex-col items-center gap-1 py-2 font-mono text-[0.55rem] uppercase tracking-[0.1em] transition-colors"
-              style={{ color: active ? "var(--color-primary)" : "var(--color-muted-foreground)" }}
+              className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 font-mono text-[0.65rem] uppercase tracking-[0.1em] transition-colors"
+              style={{
+                color: active
+                  ? "var(--color-primary)"
+                  : "var(--color-muted-foreground)",
+                background: active ? "var(--glass-ring)" : "transparent",
+              }}
             >
               <Icon />
               <span>{label}</span>
             </Link>
           );
         })}
+      </div>
+
+      {/* Lock */}
+      <div className="px-5 pb-8">
+        <form action={logout}>
+          <button
+            type="submit"
+            className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-primary"
+          >
+            lock
+          </button>
+        </form>
       </div>
     </nav>
   );

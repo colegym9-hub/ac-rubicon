@@ -73,7 +73,7 @@ export default async function DashboardPage() {
   const momentumArrow = wkTasks.dir === "up" ? "↑" : wkTasks.dir === "down" ? "↓" : "→";
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-5 pt-12 pb-24">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md md:max-w-none flex-col gap-6 px-5 md:px-10 pt-12 pb-24 md:pb-10">
       <header className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -112,52 +112,56 @@ export default async function DashboardPage() {
 
       <StatStrip stats={stats} />
 
-      <TodayCard today={today} />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <TodayCard today={today} />
 
-      <section
-        className="flex flex-col gap-3 rounded-[var(--radius)] border bg-card/60 p-4 backdrop-blur-md"
-        style={{ borderColor: "var(--glass-border)" }}
-      >
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-base font-bold">Momentum</h2>
-          <Link
-            href="/graphs"
-            className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-primary"
-          >
-            graphs →
-          </Link>
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-extrabold leading-none">{wkTasks.current}</span>
-          <span className="text-xs text-muted-foreground">tasks this week</span>
-          <span className="ml-auto text-[0.7rem] text-muted-foreground">
-            <span style={{ color: wkTasks.dir === "up" ? "var(--color-primary)" : "var(--color-muted-foreground)" }}>
-              {momentumArrow}
-            </span>{" "}
-            vs {wkTasks.previous} last
-          </span>
-        </div>
-        <MomentumChart values={recentDaily(insights)} compare={previousDaily(insights)} />
-        <div className="flex items-center gap-4 font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-[2px] w-3" style={{ background: "var(--color-primary)" }} />
-            this week
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-[2px] w-3" style={{ background: "var(--color-muted-foreground)" }} />
-            last week
-          </span>
-        </div>
-      </section>
+        <section
+          className="flex flex-col gap-3 rounded-[var(--radius)] border bg-card/60 p-4 backdrop-blur-md"
+          style={{ borderColor: "var(--glass-border)" }}
+        >
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-base font-bold">Momentum</h2>
+            <Link
+              href="/graphs"
+              className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-primary"
+            >
+              graphs →
+            </Link>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-extrabold leading-none">{wkTasks.current}</span>
+            <span className="text-xs text-muted-foreground">tasks this week</span>
+            <span className="ml-auto text-[0.7rem] text-muted-foreground">
+              <span style={{ color: wkTasks.dir === "up" ? "var(--color-primary)" : "var(--color-muted-foreground)" }}>
+                {momentumArrow}
+              </span>{" "}
+              vs {wkTasks.previous} last
+            </span>
+          </div>
+          <MomentumChart values={recentDaily(insights)} compare={previousDaily(insights)} />
+          <div className="flex items-center gap-4 font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-[2px] w-3" style={{ background: "var(--color-primary)" }} />
+              this week
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-[2px] w-3" style={{ background: "var(--color-muted-foreground)" }} />
+              last week
+            </span>
+          </div>
+        </section>
+      </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-mono text-[0.65rem] uppercase tracking-[0.25em] text-muted-foreground">
-          This week vs last
-        </h2>
-        <ComparisonGrid items={comparisons} />
-      </section>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="flex flex-col gap-3">
+          <h2 className="font-mono text-[0.65rem] uppercase tracking-[0.25em] text-muted-foreground">
+            This week vs last
+          </h2>
+          <ComparisonGrid items={comparisons} />
+        </section>
 
-      <TrackingGlance tracking={tracking} />
+        <TrackingGlance tracking={tracking} />
+      </div>
 
       <TrendsCard insights={insights} />
     </main>

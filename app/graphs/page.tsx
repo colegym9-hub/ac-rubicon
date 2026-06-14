@@ -42,7 +42,7 @@ export default async function GraphsPage() {
   const empty = configured && totalDone === 0 && planned === 0 && trends.length === 0;
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-5 pt-10 pb-24">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md md:max-w-none flex-col gap-6 px-5 md:px-10 pt-10 pb-24 md:pb-10">
       <header className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -78,39 +78,45 @@ export default async function GraphsPage() {
         </p>
       ) : null}
 
-      <Card title="Task throughput" meta={`${totalDone} done · ${range}`}>
-        <BarChart values={throughput} />
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card title="Task throughput" meta={`${totalDone} done · ${range}`}>
+          <BarChart values={throughput} />
+        </Card>
 
-      <Card
-        title="Plan adherence"
-        meta={adherencePct == null ? range : `${adherencePct}% · ${range}`}
-      >
-        <AdherenceBars data={adherence} />
-        <div className="flex items-center gap-4 font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-[1px]" style={{ background: "var(--color-primary)" }} />
-            done
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="inline-block h-2 w-2 rounded-[1px]" style={{ background: "var(--color-muted)" }} />
-            planned
-          </span>
+        <Card
+          title="Plan adherence"
+          meta={adherencePct == null ? range : `${adherencePct}% · ${range}`}
+        >
+          <AdherenceBars data={adherence} />
+          <div className="flex items-center gap-4 font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-[1px]" style={{ background: "var(--color-primary)" }} />
+              done
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2 w-2 rounded-[1px]" style={{ background: "var(--color-muted)" }} />
+              planned
+            </span>
+          </div>
+        </Card>
+      </div>
+
+      {trends.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {trends.map((trend) => {
+            const latest = [...trend.points].reverse().find((p) => p != null);
+            return (
+              <Card
+                key={trend.label}
+                title={trend.label}
+                meta={latest != null ? `latest ${latest}` : range}
+              >
+                <Sparkline points={trend.points} />
+              </Card>
+            );
+          })}
         </div>
-      </Card>
-
-      {trends.map((trend) => {
-        const latest = [...trend.points].reverse().find((p) => p != null);
-        return (
-          <Card
-            key={trend.label}
-            title={trend.label}
-            meta={latest != null ? `latest ${latest}` : range}
-          >
-            <Sparkline points={trend.points} />
-          </Card>
-        );
-      })}
+      )}
 
       <p className="font-mono text-[0.6rem] uppercase leading-relaxed tracking-[0.15em] text-muted-foreground">
         Mood-vs-WHOOP-recovery correlation arrives once WHOOP data is ingested
