@@ -29,7 +29,7 @@ const surfaces: Surface[] = [
     eyebrow: "03",
     title: "Tracking",
     body: "One-tap daily metrics that expand into notes.",
-    ready: false,
+    ready: true,
   },
   {
     href: "/graphs",
