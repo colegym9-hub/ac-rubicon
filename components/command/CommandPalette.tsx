@@ -6,6 +6,7 @@ import { getCommandIndex, type SearchItem } from "@/app/command/actions";
 import { useCommandActions } from "./useCommandActions";
 import CommandList from "./CommandList";
 import SearchIcon from "./SearchIcon";
+import { Input } from "@/components/ui/input";
 
 export default function CommandPalette() {
   const router = useRouter();
@@ -110,13 +111,13 @@ export default function CommandPalette() {
           >
             <div className="flex items-center gap-2 border-b px-4" style={{ borderColor: "var(--glass-border)" }}>
               <SearchIcon />
-              <input
+              <Input
                 ref={inputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder="Search or type a command…"
-                className="w-full bg-transparent py-4 text-base outline-none placeholder:text-muted-foreground"
+                className="w-full bg-transparent py-4 text-base outline-none placeholder:text-muted-foreground border-0 focus-visible:ring-0"
                 aria-label="Search or type a command"
               />
               <kbd className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground">esc</kbd>

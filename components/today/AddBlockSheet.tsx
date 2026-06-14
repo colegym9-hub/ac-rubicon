@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { BLOCK_KINDS, type BlockKind, type DayBlock } from "@/lib/day";
+import { Button } from "@/components/ui/button";
 
 const KIND_LABELS: Record<BlockKind, string> = {
   deep:   "Deep work",
@@ -136,23 +137,19 @@ export default function AddBlockSheet({ initialTime, editBlock, onSave, onDelete
 
         {/* Actions */}
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!label.trim()}
-            className="flex-1 rounded-[var(--radius)] bg-primary py-2.5 text-sm font-bold text-primary-foreground disabled:opacity-40"
-          >
+          <Button type="button" onClick={handleSave} disabled={!label.trim()} className="flex-1">
             {isNew ? "Add Block" : "Save"}
-          </button>
+          </Button>
           {!isNew && onDelete && (
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={onDelete}
-              className="rounded-[var(--radius)] border px-4 py-2.5 font-mono text-xs text-destructive hover:bg-destructive/10"
+              className="px-4 text-destructive hover:bg-destructive/10"
               style={border}
             >
               Delete
-            </button>
+            </Button>
           )}
         </div>
       </div>

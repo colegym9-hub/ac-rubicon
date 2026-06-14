@@ -4,6 +4,9 @@ import { useState, useTransition } from "react";
 import { createProject } from "@/app/projects/actions";
 import { CATEGORY_OPTIONS, PRIORITY_LEVELS } from "@/lib/labels";
 import type { ProjectCategory } from "@/lib/database.types";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function AddProject() {
   const [open, setOpen] = useState(false);
@@ -40,19 +43,19 @@ export default function AddProject() {
 
   if (!open) {
     return (
-      <button
+      <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="self-start rounded-[var(--radius)] bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
+        className="self-start rounded-[var(--radius)] px-4 py-2 text-sm font-bold"
       >
         + New project
-      </button>
+      </Button>
     );
   }
 
   return (
     <div className="flex flex-col gap-2 rounded-[var(--radius)] border bg-card/70 p-3" style={fieldStyle}>
-      <input
+      <Input
         value={name}
         autoFocus
         onChange={(e) => setName(e.target.value)}
@@ -65,9 +68,10 @@ export default function AddProject() {
         placeholder="Project name"
         disabled={pending}
         className="bg-transparent py-1 text-base font-bold outline-none placeholder:text-muted-foreground/50"
+        style={fieldStyle}
       />
       <div className="flex flex-wrap items-center gap-2">
-        <label className="font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">Type</label>
+        <Label className="font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">Type</Label>
         <select
           aria-label="Type"
           value={category}
@@ -81,7 +85,7 @@ export default function AddProject() {
             </option>
           ))}
         </select>
-        <label className="font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">Priority</label>
+        <Label className="font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">Priority</Label>
         <select
           aria-label="Priority"
           value={priority}
@@ -97,8 +101,8 @@ export default function AddProject() {
         </select>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">Do by</label>
-        <input
+        <Label className="font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">Do by</Label>
+        <Input
           aria-label="Do by date"
           type="date"
           value={dueDate}
@@ -107,24 +111,24 @@ export default function AddProject() {
           style={fieldStyle}
         />
         <div className="ml-auto flex items-center gap-2">
-          <button
+          <Button
             type="button"
-            onClick={() => {
-              setOpen(false);
-              setError(null);
-            }}
+            variant="ghost"
+            size="sm"
+            onClick={() => { setOpen(false); setError(null); }}
             className="font-mono text-[0.65rem] uppercase tracking-[0.15em] text-muted-foreground"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
             onClick={submit}
             disabled={pending}
-            className="rounded-[3px] bg-primary px-3 py-1 text-xs font-bold text-primary-foreground disabled:opacity-50"
+            className="rounded-[3px] px-3 py-1 text-xs font-bold disabled:opacity-50"
           >
             Add
-          </button>
+          </Button>
         </div>
       </div>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}

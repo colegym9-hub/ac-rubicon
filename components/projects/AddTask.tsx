@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import { createTask } from "@/app/projects/actions";
+import { Input } from "@/components/ui/input";
 
 export default function AddTask({
   projectId = null,
@@ -36,7 +37,7 @@ export default function AddTask({
         <span className="text-muted-foreground" aria-hidden>
           +
         </span>
-        <input
+        <Input
           ref={inputRef}
           value={title}
           onChange={(e) => setTitle(e.target.value)}

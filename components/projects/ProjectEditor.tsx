@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import { deleteProject, updateProject } from "@/app/projects/actions";
 import { CATEGORY_OPTIONS, PRIORITY_LEVELS } from "@/lib/labels";
 import type { Project } from "@/lib/database.types";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 export default function ProjectEditor({ project }: { project: Project }) {
   const router = useRouter();
@@ -32,7 +34,7 @@ export default function ProjectEditor({ project }: { project: Project }) {
 
   return (
     <section className="flex flex-col gap-3">
-      <input
+      <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
         onBlur={() => {
@@ -72,7 +74,7 @@ export default function ProjectEditor({ project }: { project: Project }) {
           ))}
         </select>
 
-        <input
+        <Input
           aria-label="Do by date"
           type="date"
           value={project.target_date ?? ""}
@@ -83,20 +85,24 @@ export default function ProjectEditor({ project }: { project: Project }) {
       </div>
 
       <div className="flex items-center gap-4 font-mono text-[0.6rem] uppercase tracking-[0.15em]">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={() => patch({ status: "archived" })}
           className="text-muted-foreground transition-colors hover:text-foreground"
         >
           Archive
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={remove}
           className="ml-auto text-destructive transition-colors hover:opacity-80"
         >
           Delete project
-        </button>
+        </Button>
       </div>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </section>

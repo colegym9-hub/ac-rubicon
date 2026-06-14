@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getToday } from "@/lib/data/today";
 import { partOfDay } from "@/lib/day";
 import CalendarView from "@/components/today/CalendarView";
-import RecapBox from "@/components/today/RecapBox";
+import RecapSheet from "@/components/today/RecapSheet";
 
 export const dynamic = "force-dynamic";
 
@@ -49,9 +49,9 @@ export default async function TodayPage() {
         <CalendarView initialDate={date} initialBlocks={blocks} />
       </div>
 
-      {/* ── Recap (scrolls below fold on tall phones) ───────────────────── */}
-      <div className="shrink-0 px-5 pb-24">
-        <RecapBox log={log} />
+      {/* ── Log card + sheet (above bottom nav) ─────────────────────────── */}
+      <div className="shrink-0 pb-20">
+        <RecapSheet log={log} />
       </div>
     </main>
   );
