@@ -100,4 +100,27 @@ AI-build = me building, you reviewing. Cole-manual = decisions, account/OAuth se
 - Your Q2 answer trailed off after "phone capture… and then" — confirm whether anything else ranks ahead of the coach/native app.
 - Brain re-ingest stays deferred by your call; revisit only if the coach (M7) underwhelms.
 
-> Status: plan complete. Nothing executes until Cole gives an explicit go. Natural first move when ready: **M0 + M1** (stand up Supabase + Vercel + the task layer) — everything depends on them and M1 is livable within the first work session.
+> Status: M0–M4 (the four v1 surfaces) built. See the Brain Expansion below for the current stretch.
+
+---
+
+## Brain Expansion (approved 2026-06-14) — supersedes M5–M7 above
+
+The four v1 surfaces (M0–M4) are built. Cole expanded the vision: the **second brain becomes a first-class, cloud-hosted surface**, and the app reshapes into a **Today / Projects / Insights / Brain** four-tab structure. The old "brain stays local + read-only" and "Claude API edge-function scheduler" assumptions are replaced. Full detail and the two reviewer passes are in the planning-run output; this is the build spec.
+
+### Architecture
+- **Routine-driven AI.** All AI (planner, brain ingest, chat, two-question re-plan, weekly lint + insight) runs as **Claude Code cloud routines on Cole's subscription** — fired by the app (a wakeup; the actual request lives in a Supabase table) or scheduled. No `ANTHROPIC_API_KEY`, no edge functions, no `ntfy`. Routine prompts are **editable `.md` in `/routines`** (the cloud routine reads the file from the connected repo, so Cole edits the file and the routine runs the latest — no re-paste).
+- **Cloud brain.** New Supabase tables: `raw_sources`, `wiki_pages`, `raw_source_wiki_pages`, `brain_log`, `brain_reports`, `brain_snippets`. The local brain (~1,244 raw sources + 29 wiki pages) migrates in as the seed; local becomes a cold backup.
+- **Capture → convert → ingest.** App captures (note / link / voice / image) → `raw_sources` (status `raw`) → routine converts to markdown (**Supadata** for links/video, **Deepgram** for voice, **Claude vision** for images) → routine files it into the wiki following `Cole-2nd-Brain/CLAUDE.md` → status `ingested`. Status is shown by **polling an API route** (no browser Supabase client).
+- **Retrieval = Postgres full-text search** (no vector embeddings, no OpenAI).
+- **Chat** = routine-based "ask your brain anything": the question lands in a table, the routine answers over wiki FTS + live app data, writes the answer back, the app polls for it.
+
+### Resequenced milestones (this stretch — "B" = Brain)
+- **B0 Foundation** — brain schema migration + apply; `/` → `/home`; Brain tab shell in nav (interim 5-tab); kill dead `/dashboard` links.
+- **B1 Migration** — seed `wiki_pages` + `raw_sources` + `brain_log` from the local brain (handle PDFs / JSON exports as text or skip-with-note).
+- **B2 Today redesign** — calendar primary + inline block check-off; morning check-in (localStorage, once/day; fill-out or review); "Log today" sheet (Tracking folds in here); two-question "re-plan from now." **Gated prerequisite:** add a `date` param to `writeRecap()` before `saveRecapForDate` so the check-in can't overwrite today's log.
+- **B3 Brain tab** — browse (captures + wiki by domain), wiki reader/editor, add-capture sheet, routine-based chat UI; **Settings route + command-palette AddMetric**; **4-tab nav swap** (Today / Projects / Insights / Brain); Graphs → Insights redirect. (AddMetric must have a home before Tracking leaves the nav.)
+- **B4 Routines + MCP** — brain MCP tools (`get_pending_work`, convert-via-Supadata, ingest, wiki read/write, FTS search, save lint/insight); the 5 routine prompts; daily catch-up + weekly lint/insight.
+
+### Cole's post-build wiring (human-only, after the code lands)
+Deploy to Vercel (so cloud routines can reach the app MCP); create the routines (paste the `/routines/*.md` prompts, connect the ac-rubicon MCP); add each routine's fire URL + token to env; first-run test (drop a YouTube link → watch it land in the wiki). Keys already in `.env.local`: Supadata, Deepgram, MCP bearer.

@@ -7,17 +7,23 @@
 ## Project Structure
 
 ```
-/app                  — Next.js App Router pages (PWA): projects, today, tracking, graphs
+/app                  — Next.js App Router pages (PWA): today, projects, insights, brain, settings
+/app/api              — route handlers: MCP server ([transport]), brain capture/chat endpoints
 /app/globals.css      — design tokens (lifted from the old Electron prototype)
-/components           — shared UI (cards, task rows, charts)
-/lib                  — supabase client, helpers, scheduler prompt builders
-/supabase/migrations  — DB schema (projects, tasks, tracking_*, daily_logs, daily_plans)
-/supabase/functions   — edge functions (scheduler; later, coach)
+/components           — shared UI (cards, task rows, charts, brain/, today/)
+/lib                  — supabase client, data layer, mcp tools, day helpers
+/lib/brain            — brain helpers (wiki full-text search, capture types, save actions)
+/supabase/migrations  — DB schema (projects, tasks, tracking_*, daily_logs, daily_plans, brain tables)
+/routines             — Claude Code routine prompts (planner, brain ingest, chat, weekly) — editable .md
 /public               — PWA manifest + icons
 ```
 
-Read-only context (NOT edited by this project): the markdown brain at
-`C:\Users\alter\Everything\Cole's Second Brain\Cole-2nd-Brain\` — especially `wiki/summer-2026-command-center.md` (the scheduler's conceptual ancestor: spine priorities, three-big-slots rule, guardrails, recap loop).
+The second brain now lives in **Supabase** (`raw_sources` + `wiki_pages` tables), seeded from the
+local markdown brain at `C:\Users\alter\Everything\Cole's Second Brain\Cole-2nd-Brain\`
+(~1,244 raw sources + 29 wiki pages). The local copy becomes a cold backup; the app reads and
+writes the cloud copy. The brain's operating rules (`Cole-2nd-Brain/CLAUDE.md`) are the SOP the
+ingest routine follows. `wiki/summer-2026-command-center.md` remains the scheduler's conceptual
+ancestor (spine priorities, three-big-slots rule, guardrails, recap loop).
 
 ---
 
@@ -39,14 +45,19 @@ Supabase + Vercel are driven via their **connected MCP servers** (provision proj
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=   # unused under the server-side service-role model; never reference in a `use client` file
-SUPABASE_SERVICE_ROLE_KEY=       # all DB access (server actions + edge functions)
+SUPABASE_SERVICE_ROLE_KEY=       # all DB access (server actions + route handlers)
 APP_PASSWORD=                    # single-user password gate
 SESSION_SECRET=                  # signs the session cookie (e.g. `openssl rand -base64 32`)
-ANTHROPIC_API_KEY=               # scheduler/coach edge functions (M2+)
-NTFY_TOPIC=                      # phone push for the daily plan (M2+)
+MCP_BEARER_TOKEN=                # auth for the app MCP server at /api/[transport]; routines call in with it
+SUPADATA_API_KEY=                # transcripts: YouTube / Instagram / TikTok / X / Facebook / file URLs (free tier)
+DEEPGRAM_API_KEY=                # voice-memo transcription (free tier)
+BRAIN_ROUTINE_TOKEN=             # bearer for firing the brain cloud routine from the app
+BRAIN_ROUTINE_FIRE_URL=          # the brain routine's "Call via API" fire URL
 ```
 
-Google Calendar + WHOOP are reached via their connected MCP servers (no keys in code for v1).
+**NOT used:** `ANTHROPIC_API_KEY` / `NTFY_TOPIC` — all AI runs as Claude Code routines on Cole's
+subscription (no pay-per-token API), and there is no OpenAI key (retrieval = Postgres full-text
+search, not embeddings). Google Calendar + WHOOP are reached via their connected MCP servers.
 
 ---
 
@@ -79,16 +90,19 @@ Lift verbatim from `design/globals.css` (copied into this repo from the old Elec
 
 ## Third-Party Services
 
-- **Supabase** — Postgres (source of truth), Auth (single user), Edge Functions.
-- **Claude API** — nightly scheduler + (later) coach. Confirm current model ids/pricing via the `claude-api` skill at build time; cheap model for nightly planning, strong model for weekly review.
+- **Supabase** — Postgres (source of truth, incl. the brain), single-user access via the service-role key; **no edge functions** (routines do the AI work).
+- **Claude Code routines** — the AI runtime for planning, brain ingest, chat, re-plan, and weekly lint/insight. Fired by the app (a wakeup; the request lives in a Supabase table) or scheduled. Run on Cole's subscription — **no `ANTHROPIC_API_KEY`**. Prompts live in `/routines/*.md`, editable.
+- **Supadata** — transcript extraction for links/video (YouTube, Instagram, TikTok, X, Facebook, file URLs). Async (may return a job id to poll) — handled inside the routine.
+- **Deepgram** — voice-memo transcription. Images/handwriting are read by Claude vision inside the routine.
 - **Google Calendar MCP** — read events, write the day's blocks.
 - **WHOOP MCP** — recovery/sleep/strain to calibrate the plan.
-- **ntfy** — push the daily plan to Cole's phone before he's at his desk.
 
 ---
 
 ## Known Issues / Watch Out For
 
-- **Brain staleness:** only ~3 weeks of ChatGPT history is ingested; the future coach (M7) is capped by this, not the v1 surfaces.
 - The **scheduler only gets good through daily use + the recap loop** — expect ~3–4 weeks of tuning, not a one-shot build. Always emit a plain-language rationale so Cole trusts (and follows) the plan.
-- Single-user app: keep RLS simple but present.
+- **Brain retrieval is full-text search, not semantic** — fine for ~30–100 wiki pages; if recall proves weak, revisit (Supabase has a free in-DB embedding option) rather than adding an OpenAI dependency.
+- **Routine reachability:** cloud routines reach the app only once it's deployed to Vercel (they can't hit localhost). Build/verify against localhost; routine wiring is a post-deploy step Cole does.
+- **iOS PWA limits:** no background (screen-off) voice recording; the camera/file picker always shows the system sheet; Instagram beyond what Supadata returns is out of scope.
+- Single-user app: RLS enabled deny-by-default; the **browser never holds a Supabase client** — capture status updates poll an API route, not a browser Supabase subscription.
