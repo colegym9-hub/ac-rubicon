@@ -13,11 +13,12 @@ export type Action = {
 
 const NAV = [
   { href: "/home", label: "Home" },
-  { href: "/projects", label: "Projects" },
   { href: "/today", label: "Today" },
-  { href: "/tracking", label: "Tracking" },
-  { href: "/graphs", label: "Graphs" },
+  { href: "/projects", label: "Projects" },
+  { href: "/insights", label: "Insights" },
   { href: "/brain", label: "Brain" },
+  { href: "/tracking", label: "Tracking" },
+  { href: "/settings", label: "Settings" },
 ];
 
 const SECTION_FOR = { project: "Projects", task: "Tasks", metric: "Metrics" } as const;

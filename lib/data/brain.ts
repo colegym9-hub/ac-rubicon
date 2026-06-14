@@ -9,6 +9,7 @@ import type {
   SourceEntry,
   ChatTurn,
 } from "@/lib/brain/types";
+import type { BrainReport } from "@/lib/database.types";
 
 const DOMAIN_ORDER = ["A.C Media", "BU", "Content", "Coursework", "Personal Ops", "Mindset"];
 
@@ -160,4 +161,21 @@ export async function getChat(id: string): Promise<ChatTurn | null> {
     ? (data.citations as { slug: string; title: string }[])
     : [];
   return { ...data, citations };
+}
+
+// ── Weekly reports (lint / insight — written by the Monday routine) ──────────
+
+export async function getLatestReport(kind: "lint" | "insight"): Promise<BrainReport | null> {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("brain_reports")
+    .select("*")
+    .eq("kind", kind)
+    .eq("status", "done")
+    .order("week_of", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ?? null;
 }

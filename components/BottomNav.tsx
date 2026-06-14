@@ -14,13 +14,11 @@ const ICON_PROPS = {
   strokeLinejoin: "round" as const,
 };
 
-function DashIcon() {
+function TodayIcon() {
   return (
     <svg {...ICON_PROPS}>
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18M8 2v4M16 2v4" />
     </svg>
   );
 }
@@ -33,19 +31,13 @@ function BoardIcon() {
     </svg>
   );
 }
-function TodayIcon() {
+function InsightsIcon() {
   return (
     <svg {...ICON_PROPS}>
-      <rect x="3" y="4" width="18" height="17" rx="2" />
-      <path d="M3 9h18M8 2v4M16 2v4" />
-    </svg>
-  );
-}
-function TrackIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M9 11l3 3 9-9" />
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      <path d="M3 21h18" />
+      <rect x="5" y="11" width="3.5" height="7" rx="1" />
+      <rect x="10.25" y="6" width="3.5" height="12" rx="1" />
+      <rect x="15.5" y="13" width="3.5" height="5" rx="1" />
     </svg>
   );
 }
@@ -61,10 +53,9 @@ function BrainIcon() {
 }
 
 const TABS = [
-  { href: "/home", label: "Home", Icon: DashIcon },
-  { href: "/projects", label: "Projects", Icon: BoardIcon },
   { href: "/today", label: "Today", Icon: TodayIcon },
-  { href: "/tracking", label: "Track", Icon: TrackIcon },
+  { href: "/projects", label: "Projects", Icon: BoardIcon },
+  { href: "/insights", label: "Insights", Icon: InsightsIcon },
   { href: "/brain", label: "Brain", Icon: BrainIcon },
 ];
 
@@ -83,8 +74,7 @@ export default function BottomNav() {
     >
       <div className="mx-auto flex w-full max-w-md items-stretch justify-around px-2">
         {TABS.map(({ href, label, Icon }) => {
-          const active =
-            pathname === href || (href !== "/home" && pathname.startsWith(`${href}`));
+          const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
               key={href}

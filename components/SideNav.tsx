@@ -15,13 +15,11 @@ const ICON_PROPS = {
   strokeLinejoin: "round" as const,
 };
 
-function DashIcon() {
+function TodayIcon() {
   return (
     <svg {...ICON_PROPS}>
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      <rect x="3" y="4" width="18" height="17" rx="2" />
+      <path d="M3 9h18M8 2v4M16 2v4" />
     </svg>
   );
 }
@@ -34,19 +32,13 @@ function BoardIcon() {
     </svg>
   );
 }
-function TodayIcon() {
+function InsightsIcon() {
   return (
     <svg {...ICON_PROPS}>
-      <rect x="3" y="4" width="18" height="17" rx="2" />
-      <path d="M3 9h18M8 2v4M16 2v4" />
-    </svg>
-  );
-}
-function TrackIcon() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M9 11l3 3 9-9" />
-      <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+      <path d="M3 21h18" />
+      <rect x="5" y="11" width="3.5" height="7" rx="1" />
+      <rect x="10.25" y="6" width="3.5" height="12" rx="1" />
+      <rect x="15.5" y="13" width="3.5" height="5" rx="1" />
     </svg>
   );
 }
@@ -62,10 +54,9 @@ function BrainIcon() {
 }
 
 const TABS = [
-  { href: "/home", label: "Home", Icon: DashIcon },
-  { href: "/projects", label: "Projects", Icon: BoardIcon },
   { href: "/today", label: "Today", Icon: TodayIcon },
-  { href: "/tracking", label: "Track", Icon: TrackIcon },
+  { href: "/projects", label: "Projects", Icon: BoardIcon },
+  { href: "/insights", label: "Insights", Icon: InsightsIcon },
   { href: "/brain", label: "Brain", Icon: BrainIcon },
 ];
 
@@ -83,25 +74,15 @@ export default function SideNav() {
     >
       {/* Brand → home */}
       <Link href="/home" className="block px-5 pt-8 pb-6">
-        <span className="font-mono text-[0.55rem] uppercase tracking-[0.3em] text-muted-foreground">
-          AC
-        </span>
-        <h1 className="text-xl font-extrabold leading-tight tracking-tight">
-          Rubicon
-        </h1>
+        <span className="font-mono text-[0.55rem] uppercase tracking-[0.3em] text-muted-foreground">AC</span>
+        <h1 className="text-xl font-extrabold leading-tight tracking-tight">Rubicon</h1>
       </Link>
 
-      <div
-        className="mx-4 mb-4 h-px"
-        style={{ background: "var(--glass-border)" }}
-      />
+      <div className="mx-4 mb-4 h-px" style={{ background: "var(--glass-border)" }} />
 
-      {/* Nav items */}
       <div className="flex flex-1 flex-col gap-1 px-3">
         {TABS.map(({ href, label, Icon }) => {
-          const active =
-            pathname === href ||
-            (href !== "/home" && pathname.startsWith(`${href}`));
+          const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
               key={href}
@@ -109,9 +90,7 @@ export default function SideNav() {
               aria-current={active ? "page" : undefined}
               className="flex items-center gap-3 rounded-[var(--radius)] px-3 py-2.5 font-mono text-[0.65rem] uppercase tracking-[0.1em] transition-colors"
               style={{
-                color: active
-                  ? "var(--color-primary)"
-                  : "var(--color-muted-foreground)",
+                color: active ? "var(--color-primary)" : "var(--color-muted-foreground)",
                 background: active ? "var(--glass-ring)" : "transparent",
               }}
             >
@@ -122,7 +101,6 @@ export default function SideNav() {
         })}
       </div>
 
-      {/* Lock */}
       <div className="px-5 pb-8">
         <form action={logout}>
           <button

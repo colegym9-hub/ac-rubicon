@@ -24,7 +24,7 @@ export default function TrendsCard({ insights }: { insights: Insights }) {
         <h2 className="text-base font-bold">Trends</h2>
         {unlocked ? (
           <Link
-            href="/graphs"
+            href="/insights"
             className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-primary"
           >
             all →

@@ -122,10 +122,10 @@ export default async function HomePage() {
           <div className="flex items-baseline justify-between">
             <h2 className="text-base font-bold">Momentum</h2>
             <Link
-              href="/graphs"
+              href="/insights"
               className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground transition-colors hover:text-primary"
             >
-              graphs →
+              insights →
             </Link>
           </div>
           <div className="flex items-baseline gap-2">
