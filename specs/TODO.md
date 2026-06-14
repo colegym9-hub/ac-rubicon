@@ -33,9 +33,9 @@
   - [ ] **NEEDS ME (architecture fork) — the AI scheduler.** PLAN says "nightly Supabase **edge function** → Claude + Calendar(MCP) + WHOOP(MCP) → plan + ntfy push." Problem: a deployed Supabase edge function **cannot reach the connected MCP servers** (they're attached to the Claude Code session, not Supabase). Decide the runtime — see NEEDS ME. Needs `ANTHROPIC_API_KEY` + `NTFY_TOPIC`.
   - [ ] WHOOP recovery chip + Calendar next-event on the Today view (depends on the same runtime decision).
   - [ ] "Re-plan from now" (depends on the scheduler existing).
-  - [ ] Timezone: `todayISO()` uses server-local date — store Cole's TZ before the nightly job relies on "today".
-- [ ] **M3 — Tracking logger:** one-tap metrics + expand-to-notes + add-a-metric (`tracking_metrics` / `tracking_entries`).
-- [ ] **M4 — Graphs:** task throughput, tracking trends (e.g. mood vs WHOOP recovery), plan-adherence chart.
+  - [ ] Timezone: `todayISO()` (and `insights.ts` day-bucketing via `completed_at.slice(0,10)`) use server-local/UTC dates — store Cole's TZ before the nightly job or charts rely on "today". Flagged by @reviewer.
+- [x] **M3 — Tracking logger:** one-tap metrics (bool/count/scale/duration/note) + expand-to-notes + add-a-metric. **BUILT** — `/tracking`, build+render verified; live save needs the service-role key.
+- [x] **M4 — Graphs:** task throughput + plan-adherence (planned vs done) + numeric-metric trend sparklines, dependency-free SVG. **BUILT** — `/graphs`, build+render verified. (Mood-vs-WHOOP-recovery overlay deferred — needs WHOOP data ingestion.)
 - [ ] Later (out of v1 scope): M5 phone capture · M6 brain→scheduler · M7 coach · M8 native iOS app.
 
 ---

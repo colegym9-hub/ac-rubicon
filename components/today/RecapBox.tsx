@@ -7,6 +7,7 @@ import type { DailyLog } from "@/lib/database.types";
 export default function RecapBox({ log }: { log: DailyLog | null }) {
   const [recap, setRecap] = useState(log?.recap_text ?? "");
   const [energy, setEnergy] = useState<number | "">(log?.energy ?? "");
+  const [slotsDone, setSlotsDone] = useState<number | "">(log?.slots_done ?? "");
   const [slipped, setSlipped] = useState(log?.slots_slipped ?? "");
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +19,7 @@ export default function RecapBox({ log }: { log: DailyLog | null }) {
       const res = await saveRecap({
         recap,
         energy: energy === "" ? null : Number(energy),
+        slotsDone: slotsDone === "" ? null : Number(slotsDone),
         slotsSlipped: slipped,
       });
       if (res?.error) {
@@ -76,18 +78,33 @@ export default function RecapBox({ log }: { log: DailyLog | null }) {
             </option>
           ))}
         </select>
+        <label className="ml-2 font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground">
+          Slots done
+        </label>
         <input
-          aria-label="What slipped"
-          value={slipped}
+          aria-label="Slots done"
+          type="number"
+          min={0}
+          value={slotsDone}
           onChange={(e) => {
-            setSlipped(e.target.value);
+            setSlotsDone(e.target.value === "" ? "" : Number(e.target.value));
             setSaved(false);
           }}
-          placeholder="What slipped + why"
-          className="min-w-0 flex-1 rounded-[3px] border bg-transparent px-2 py-1 text-sm outline-none placeholder:text-muted-foreground/50"
+          className="w-16 rounded-[3px] border bg-transparent px-2 py-1 text-sm outline-none"
           style={fieldStyle}
         />
       </div>
+      <input
+        aria-label="What slipped"
+        value={slipped}
+        onChange={(e) => {
+          setSlipped(e.target.value);
+          setSaved(false);
+        }}
+        placeholder="What slipped + why"
+        className="rounded-[3px] border bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground/50"
+        style={fieldStyle}
+      />
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       <button
         type="button"

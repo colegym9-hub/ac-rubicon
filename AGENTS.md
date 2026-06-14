@@ -72,7 +72,7 @@ Lift verbatim from `design/globals.css` (copied into this repo from the old Elec
 
 - PascalCase component files; one component per file; props typed inline.
 - `use client` only when interactivity / browser APIs are needed.
-- Charts via Recharts over Supabase queries.
+- Charts: dependency-free inline SVG (`components/graphs/Charts.tsx`) over Supabase queries — Recharts was the original pick but avoided to skip the dependency; swap in later if richer interaction is needed.
 - Keep the four surfaces focused — no generic block editor or DB-engine UI.
 
 ---

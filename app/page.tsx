@@ -36,7 +36,7 @@ const surfaces: Surface[] = [
     eyebrow: "04",
     title: "Graphs",
     body: "Throughput, trends, and the plan-vs-done adherence mirror.",
-    ready: false,
+    ready: true,
   },
 ];
 

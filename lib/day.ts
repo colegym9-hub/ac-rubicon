@@ -31,8 +31,9 @@ export const BLOCK_KINDS: BlockKind[] = [
 ];
 
 // NOTE (known limitation): uses the server's local date. On a UTC host (Vercel)
-// "today" can roll over before Cole's local midnight — store Cole's timezone
-// before relying on this for the nightly scheduler. Tracked in specs/TODO.md.
+// "today" can roll over before Cole's local midnight. The same UTC assumption
+// affects insights.ts day-bucketing (completed_at.slice(0,10)). Store Cole's
+// timezone before the nightly scheduler / charts depend on "today". (specs/TODO.md)
 export function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -41,11 +42,14 @@ export function nowHHMM(): string {
   return new Date().toTimeString().slice(0, 5);
 }
 
-/** Parse "HH:MM" → minutes since midnight (NaN-safe → -1). */
+/** Parse "HH:MM" → minutes since midnight. Returns -1 for malformed or out-of-range. */
 export function toMinutes(hhmm: string): number {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
   if (!m) return -1;
-  return Number(m[1]) * 60 + Number(m[2]);
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return -1;
+  return h * 60 + min;
 }
 
 export function sortBlocks(blocks: DayBlock[]): DayBlock[] {

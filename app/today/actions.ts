@@ -2,12 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import { BLOCK_KINDS, type BlockKind, type DayBlock, todayISO } from "@/lib/day";
+import {
+  BLOCK_KINDS,
+  type BlockKind,
+  type DayBlock,
+  toMinutes,
+  todayISO,
+} from "@/lib/day";
 
 export type ActionResult = { error?: string };
 
 const KINDS = new Set<string>(BLOCK_KINDS);
-const HHMM = /^\d{1,2}:\d{2}$/;
 
 function sanitizeBlocks(input: unknown): DayBlock[] {
   if (!Array.isArray(input)) return [];
@@ -23,7 +28,7 @@ function sanitizeBlocks(input: unknown): DayBlock[] {
       rationale: x.rationale ? String(x.rationale).slice(0, 300) : null,
       done: Boolean(x.done),
     }))
-    .filter((b) => b.label && HHMM.test(b.start) && HHMM.test(b.end));
+    .filter((b) => b.label && toMinutes(b.start) >= 0 && toMinutes(b.end) >= 0);
 }
 
 export async function saveDayPlan(blocks: DayBlock[]): Promise<ActionResult> {
