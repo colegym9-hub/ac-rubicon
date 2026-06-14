@@ -30,6 +30,12 @@ export async function getCommandIndex(): Promise<SearchItem[]> {
     supabase.from("tracking_metrics").select("id, label").eq("active", true),
   ]);
 
+  // Supabase returns errors in-band (not thrown) — surface them so a DB hiccup
+  // doesn't silently drop projects/tasks from search. The caller catches + degrades.
+  if (projectsRes.error) throw new Error(projectsRes.error.message);
+  if (tasksRes.error) throw new Error(tasksRes.error.message);
+  if (metricsRes.error) throw new Error(metricsRes.error.message);
+
   const items: SearchItem[] = [];
   for (const p of projectsRes.data ?? []) {
     items.push({
