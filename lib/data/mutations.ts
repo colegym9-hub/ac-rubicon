@@ -35,7 +35,7 @@ export function sanitizeBlocks(input: unknown): DayBlock[] {
       rationale: x.rationale ? String(x.rationale).slice(0, 300) : null,
       done: Boolean(x.done),
     }))
-    .filter((b) => b.label && toMinutes(b.start) >= 0 && toMinutes(b.end) >= 0);
+    .filter((b) => b.label && toMinutes(b.start) >= 0 && toMinutes(b.end) > toMinutes(b.start));
 }
 
 // ── Today: plan + recap ───────────────────────────────────────────────────────

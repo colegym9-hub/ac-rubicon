@@ -7,19 +7,19 @@ import BlockChip from "./BlockChip";
 import AddBlockSheet from "./AddBlockSheet";
 
 // ─── constants ────────────────────────────────────────────────────────────────
-const HOUR_W   = 44;   // px — left label column
-const DEF_PX   = 80;   // px per hour default
-const MIN_PX   = 40;
-const MAX_PX   = 220;
-const SNAP     = 15;   // minute snap grid
+const HOUR_W = 44;   // px — left label column
+const DEF_PX = 80;   // px per hour default
+const MIN_PX = 40;
+const MAX_PX = 220;
+const SNAP   = 15;   // minute snap grid
 
 // ─── date helpers ─────────────────────────────────────────────────────────────
-const DAY_ABBR   = ["S", "M", "T", "W", "T", "F", "S"];
+const DAY_ABBR   = ["Su", "M", "Tu", "W", "Th", "F", "Sa"];
 const MONTH_FULL = ["January","February","March","April","May","June",
                     "July","August","September","October","November","December"];
 
-function isoDate(d: Date)   { return d.toISOString().slice(0, 10); }
-function todayStr()         { return isoDate(new Date()); }
+function isoDate(d: Date)  { return d.toISOString().slice(0, 10); }
+function todayStr()        { return isoDate(new Date()); }
 
 function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T00:00:00`);
@@ -33,11 +33,7 @@ function weekSunday(iso: string) {
   return isoDate(d);
 }
 
-function monthOf(iso: string) { return iso.slice(0, 7); }
-
-function monthStart(iso: string) {
-  return `${monthOf(iso)}-01`;
-}
+function monthStart(iso: string) { return `${iso.slice(0, 7)}-01`; }
 
 function daysInMonth(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
@@ -52,8 +48,10 @@ function fmtHour(h: number) {
 }
 
 function minsToHHMM(m: number) {
-  const hh = Math.floor(m / 60) % 24;
-  const mm = m % 60;
+  // Clamp to 23:59 so "00:00" never sneaks in from 1440
+  const clamped = Math.min(m, 23 * 60 + 59);
+  const hh = Math.floor(clamped / 60);
+  const mm = clamped % 60;
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
@@ -61,29 +59,40 @@ function snapMins(raw: number, snap = SNAP) {
   return Math.round(raw / snap) * snap;
 }
 
-// ─── overlap layout ───────────────────────────────────────────────────────────
+// ─── overlap layout (interval-graph column assignment) ────────────────────────
 type LayoutBlock = DayBlock & { col: number; cols: number };
 
 function layoutBlocks(blocks: DayBlock[]): LayoutBlock[] {
   const sorted = sortBlocks(blocks);
   const out: LayoutBlock[] = sorted.map(b => ({ ...b, col: 0, cols: 1 }));
 
+  // Step 1: greedy column assignment in time order
+  const colEnds: number[] = [];
+  for (const b of out) {
+    const sMin = toMinutes(b.start);
+    let col = colEnds.findIndex(end => end <= sMin);
+    if (col === -1) { col = colEnds.length; colEnds.push(0); }
+    colEnds[col] = toMinutes(b.end);
+    b.col = col;
+  }
+
+  // Step 2: for every block, cols = max column used by any block it overlaps + 1
   for (let i = 0; i < out.length; i++) {
-    const aS = toMinutes(out[i].start);
-    const aE = toMinutes(out[i].end);
-    const peers = out.filter((b, j) => j !== i && toMinutes(b.start) < aE && toMinutes(b.end) > aS);
-    if (!peers.length) continue;
-    const group = [out[i], ...peers].sort((x, y) => toMinutes(x.start) - toMinutes(y.start));
-    const ids = [...new Set(group.map(b => b.id))];
-    ids.forEach((id, col) => {
-      const idx = out.findIndex(b => b.id === id);
-      if (idx >= 0) { out[idx].col = col; out[idx].cols = ids.length; }
-    });
+    const sMin = toMinutes(out[i].start);
+    const eMin = toMinutes(out[i].end);
+    let maxCol = out[i].col;
+    for (let j = 0; j < out.length; j++) {
+      if (j === i) continue;
+      if (toMinutes(out[j].start) < eMin && toMinutes(out[j].end) > sMin) {
+        maxCol = Math.max(maxCol, out[j].col);
+      }
+    }
+    out[i].cols = maxCol + 1;
   }
   return out;
 }
 
-// ─── gesture state shape ──────────────────────────────────────────────────────
+// ─── gesture state ────────────────────────────────────────────────────────────
 type GestureMode = "pending" | "drag" | "resize";
 interface Gesture {
   mode:         GestureMode;
@@ -92,6 +101,7 @@ interface Gesture {
   startY:       number;
   origStartMin: number;
   origEndMin:   number;
+  origBlocks:   DayBlock[];   // snapshot at drag start — prevents stale-ref bug
   timer:        ReturnType<typeof setTimeout> | null;
 }
 
@@ -110,26 +120,28 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   const [dragVisual, setDragVisual]     = useState<{ id: string; startMin: number; endMin: number } | null>(null);
   const [sheet, setSheet]               = useState<{ open: boolean; time?: string; edit?: DayBlock }>({ open: false });
   const [nowMin, setNowMin]             = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
-  const [, startTrans]                  = useTransition();
+  const [isPending, startTrans]         = useTransition();
 
   const today    = todayStr();
   const weekSun  = weekSunday(selectedDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekSun, i));
 
-  // Mutable refs (avoid stale closures in event listeners)
-  const pxRef          = useRef(pxPerHour);
-  const blocksRef      = useRef(blocks);
-  const dragVisualRef  = useRef(dragVisual);
-  const scrollRef      = useRef<HTMLDivElement>(null);
-  const gridRef        = useRef<HTMLDivElement>(null);
-  const pinchRef       = useRef<{ dist: number; topMin: number; startPx: number } | null>(null);
-  const gestureRef     = useRef<Gesture | null>(null);
-  const cleanupRef     = useRef<(() => void) | null>(null);
-  const headerTouchX   = useRef<number | null>(null);
+  // Mutable refs to avoid stale closures in event listeners
+  const pxRef         = useRef(pxPerHour);
+  const dragVisualRef = useRef(dragVisual);
+  const scrollRef     = useRef<HTMLDivElement>(null);
+  const gridRef       = useRef<HTMLDivElement>(null);
+  const pinchRef      = useRef<{ dist: number; topMin: number; startPx: number } | null>(null);
+  const gestureRef    = useRef<Gesture | null>(null);
+  const cleanupRef    = useRef<(() => void) | null>(null);
+  const headerTouchX  = useRef<number | null>(null);
+  const gridTapStart  = useRef<{ y: number; t: number } | null>(null);
 
-  useEffect(() => { pxRef.current = pxPerHour; },  [pxPerHour]);
-  useEffect(() => { blocksRef.current = blocks; },  [blocks]);
+  useEffect(() => { pxRef.current = pxPerHour; },      [pxPerHour]);
   useEffect(() => { dragVisualRef.current = dragVisual; }, [dragVisual]);
+
+  // Cleanup window listeners on unmount (in case a drag is in progress)
+  useEffect(() => () => { cleanupRef.current?.(); }, []);
 
   // Tick nowMin every minute
   useEffect(() => {
@@ -144,8 +156,7 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   useEffect(() => {
     if (!scrollRef.current) return;
     const d = new Date();
-    const mins = d.getHours() * 60 + d.getMinutes();
-    scrollRef.current.scrollTop = Math.max(0, ((mins - 120) / 60) * DEF_PX);
+    scrollRef.current.scrollTop = Math.max(0, ((d.getHours() * 60 + d.getMinutes() - 120) / 60) * DEF_PX);
   }, []);
 
   // Non-passive pinch zoom
@@ -155,8 +166,7 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
 
     function onStart(e: TouchEvent) {
       if (e.touches.length !== 2) return;
-      const t1 = e.touches[0] as Touch;
-      const t2 = e.touches[1] as Touch;
+      const t1 = e.touches[0] as Touch, t2 = e.touches[1] as Touch;
       pinchRef.current = {
         dist:    Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY),
         topMin:  ((scrollRef.current as HTMLDivElement).scrollTop / pxRef.current) * 60,
@@ -167,8 +177,7 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
     function onMove(e: TouchEvent) {
       if (e.touches.length !== 2 || !pinchRef.current) return;
       e.preventDefault();
-      const t1 = e.touches[0] as Touch;
-      const t2 = e.touches[1] as Touch;
+      const t1 = e.touches[0] as Touch, t2 = e.touches[1] as Touch;
       const newDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       const scale   = newDist / pinchRef.current.dist;
       const newPx   = Math.min(MAX_PX, Math.max(MIN_PX, pinchRef.current.startPx * scale));
@@ -189,36 +198,43 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   }, []);
 
   // ── persist ──────────────────────────────────────────────────────────────────
-  function persist(next: DayBlock[]) {
+  function persist(next: DayBlock[], date = selectedDate) {
     const sorted = sortBlocks(next);
     setBlocks(sorted);
-    startTrans(async () => { await saveDayPlan(sorted, selectedDate); });
+    startTrans(async () => { await saveDayPlan(sorted, date); });
   }
 
   // ── date navigation ──────────────────────────────────────────────────────────
-  const selectDate = useCallback(async (date: string) => {
+  const selectDate = useCallback((date: string) => {
     if (date === selectedDate) return;
     setSelectedDate(date);
-    setMonthCursor(monthStart(date));
     setShowMonth(false);
+    // Only move monthCursor when picker is currently open
+    setMonthCursor(prev => showMonth ? monthStart(date) : prev);
     if (date === initialDate) {
       setBlocks(sortBlocks(initialBlocks));
     } else {
       startTrans(async () => {
-        const { blocks: fetched } = await fetchBlocksForDate(date);
-        setBlocks(fetched);
+        try {
+          const { blocks: fetched } = await fetchBlocksForDate(date);
+          setBlocks(fetched);
+        } catch {
+          setBlocks([]);
+        }
       });
     }
-  }, [selectedDate, initialDate, initialBlocks]);
+  }, [selectedDate, initialDate, initialBlocks, showMonth]);
 
   // ── block gestures ────────────────────────────────────────────────────────────
   function onBlockPointerDown(e: React.PointerEvent<HTMLDivElement>, block: DayBlock) {
     e.stopPropagation();
-    cleanupRef.current?.(); // cancel any in-flight gesture
+    cleanupRef.current?.();
 
-    const isResize = !!(e.target as HTMLElement).closest("[data-resize]");
+    const isResize     = !!(e.target as HTMLElement).closest("[data-resize]");
     const origStartMin = toMinutes(block.start);
     const origEndMin   = toMinutes(block.end);
+    // Snapshot current blocks NOW — guards against stale ref if date changes mid-drag
+    const origBlocks   = [...(gestureRef.current?.origBlocks ?? blocks)];
 
     gestureRef.current = {
       mode:         isResize ? "resize" : "pending",
@@ -227,6 +243,7 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
       startY:       e.clientY,
       origStartMin,
       origEndMin,
+      origBlocks,
       timer: isResize ? null : setTimeout(() => {
         const g = gestureRef.current;
         if (g?.mode === "pending" && g.blockId === block.id) {
@@ -241,7 +258,6 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
       setDragVisual({ id: block.id, startMin: origStartMin, endMin: origEndMin });
     }
 
-    // Global move/up listeners (works regardless of where pointer goes)
     function onMove(ev: PointerEvent) {
       if (ev.pointerId !== e.pointerId) return;
       const g = gestureRef.current;
@@ -262,7 +278,8 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
         const newStart = Math.min(23 * 60, Math.max(0, g.origStartMin + dyMins));
         setDragVisual({ id: block.id, startMin: newStart, endMin: newStart + (g.origEndMin - g.origStartMin) });
       } else {
-        const newEnd = Math.min(24 * 60, Math.max(g.origStartMin + SNAP, g.origEndMin + dyMins));
+        // Resize: clamp to 23:45 max so minsToHHMM never produces "00:00"
+        const newEnd = Math.min(23 * 60 + 45, Math.max(g.origStartMin + SNAP, g.origEndMin + dyMins));
         setDragVisual({ id: block.id, startMin: g.origStartMin, endMin: newEnd });
       }
     }
@@ -276,7 +293,8 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
       if (!g || g.mode === "pending") {
         setSheet({ open: true, edit: block });
       } else if (dv) {
-        const updated = blocksRef.current.map(b =>
+        // Use the snapshotted origBlocks — not blocksRef — to avoid stale state
+        const updated = g.origBlocks.map(b =>
           b.id === block.id ? { ...b, start: minsToHHMM(dv.startMin), end: minsToHHMM(dv.endMin) } : b,
         );
         setDragVisual(null);
@@ -298,9 +316,7 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
     };
   }
 
-  // ── grid tap (add block) ─────────────────────────────────────────────────────
-  const gridTapStart = useRef<{ y: number; t: number } | null>(null);
-
+  // ── grid tap → add block ─────────────────────────────────────────────────────
   function onGridPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if ((e.target as HTMLElement).closest("[data-block]")) return;
     gridTapStart.current = { y: e.clientY, t: Date.now() };
@@ -314,8 +330,7 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
     if ((e.target as HTMLElement).closest("[data-block]")) return;
 
     const rect = gridRef.current!.getBoundingClientRect();
-    const y    = e.clientY - rect.top; // rect.top already accounts for scroll
-    const mins = Math.min(23 * 60, Math.max(0, snapMins((y / pxPerHour) * 60)));
+    const mins = Math.min(23 * 60, Math.max(0, snapMins(((e.clientY - rect.top) / pxPerHour) * 60)));
     setSheet({ open: true, time: minsToHHMM(mins) });
   }
 
@@ -331,19 +346,19 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   }
 
   // ── month picker ──────────────────────────────────────────────────────────────
-  const mcD = new Date(`${monthCursor}T00:00:00`);
+  const mcD    = new Date(`${monthCursor}T00:00:00`);
   const mcLabel = `${MONTH_FULL[mcD.getMonth()]} ${mcD.getFullYear()}`;
 
   function shiftMonth(n: number) {
     const d = new Date(`${monthCursor}T00:00:00`);
     d.setMonth(d.getMonth() + n);
-    setMonthCursor(isoDate(d).slice(0, 8) + "01");
+    setMonthCursor(monthStart(isoDate(d)));
   }
 
   const mFirstDay = new Date(`${monthCursor}T00:00:00`).getDay();
   const mDays     = daysInMonth(monthCursor);
   const mCells: Array<string | null> = [
-    ...Array(mFirstDay).fill(null),
+    ...Array<null>(mFirstDay).fill(null),
     ...Array.from({ length: mDays }, (_, i) =>
       `${monthCursor.slice(0, 7)}-${String(i + 1).padStart(2, "0")}`,
     ),
@@ -351,12 +366,10 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   while (mCells.length % 7 !== 0) mCells.push(null);
 
   // ── layout ────────────────────────────────────────────────────────────────────
-  const laidOut = useMemo(() => layoutBlocks(blocks), [blocks]);
-
-  const selD  = new Date(`${selectedDate}T00:00:00`);
+  const laidOut  = useMemo(() => layoutBlocks(blocks), [blocks]);
+  const selD     = new Date(`${selectedDate}T00:00:00`);
   const hdrLabel = `${MONTH_FULL[selD.getMonth()]} ${selD.getFullYear()}`;
-
-  const border = { borderColor: "var(--glass-border)" };
+  const border   = { borderColor: "var(--glass-border)" };
 
   return (
     <div className="flex h-full flex-col">
@@ -372,36 +385,36 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
           if (Math.abs(dx) > 50) selectDate(addDays(selectedDate, dx < 0 ? 7 : -7));
         }}
       >
-        {/* Top row: month label + today + nav arrows */}
+        {/* Month label + nav */}
         <div className="flex items-center justify-between px-1 pb-1">
           <button
             type="button"
             className="flex items-center gap-1 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-foreground"
             onClick={() => {
+              if (!showMonth) setMonthCursor(monthStart(selectedDate));
               setShowMonth(!showMonth);
-              setMonthCursor(monthStart(selectedDate));
             }}
           >
             {showMonth ? mcLabel : hdrLabel}
-            <span className="text-muted-foreground text-[0.5rem]">{showMonth ? "▲" : "▼"}</span>
+            <span className="text-[0.5rem] text-muted-foreground">{showMonth ? "▲" : "▼"}</span>
           </button>
           <div className="flex items-center gap-0.5">
             <button type="button" onClick={() => selectDate(addDays(selectedDate, -7))} className="px-2 py-1 text-lg text-muted-foreground hover:text-foreground">‹</button>
-            <button type="button" onClick={() => selectDate(today)} className="px-2 py-0.5 font-mono text-[0.55rem] uppercase tracking-[0.15em] text-primary border rounded-[3px]" style={border}>Today</button>
+            <button type="button" onClick={() => selectDate(today)} className="rounded-[3px] border px-2 py-0.5 font-mono text-[0.55rem] uppercase tracking-[0.15em] text-primary" style={border}>Today</button>
             <button type="button" onClick={() => selectDate(addDays(selectedDate, 7))}  className="px-2 py-1 text-lg text-muted-foreground hover:text-foreground">›</button>
           </div>
         </div>
 
-        {/* Day-of-week abbreviation row */}
+        {/* Day-of-week labels */}
         <div className="grid grid-cols-7 border-t" style={border}>
           {DAY_ABBR.map((a, i) => (
-            <span key={i} className="py-0.5 text-center font-mono text-[0.5rem] uppercase tracking-[0.1em] text-muted-foreground">
+            <span key={i} className="py-0.5 text-center font-mono text-[0.5rem] uppercase tracking-[0.05em] text-muted-foreground">
               {a}
             </span>
           ))}
         </div>
 
-        {/* ── Week row OR Month grid ──────────────────────────────────────── */}
+        {/* Week pills OR month grid */}
         {showMonth ? (
           <div className="border-t pt-1" style={border}>
             <div className="flex items-center justify-between px-2 pb-1">
@@ -463,18 +476,24 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
         )}
       </div>
 
-      {/* ── Scrollable 24h timeline ──────────────────────────────────────── */}
+      {/* ── Scrollable 24h timeline ───────────────────────────────────────── */}
       <div
         ref={scrollRef}
         className="relative flex-1 overflow-y-auto"
         style={{ overscrollBehavior: "contain" }}
       >
+        {/* Loading bar */}
+        {isPending && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-30 h-0.5 animate-pulse bg-primary/60" />
+        )}
+
         <div
           ref={gridRef}
           className="relative select-none"
           style={{ height: 24 * pxPerHour, touchAction: "pan-y" }}
           onPointerDown={onGridPointerDown}
           onPointerUp={onGridPointerUp}
+          onPointerCancel={() => { gridTapStart.current = null; }}
         >
           {/* Hour lines + labels */}
           {Array.from({ length: 25 }, (_, h) => (
@@ -520,20 +539,19 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
             const eMin = toMinutes(block.end);
             if (sMin < 0 || eMin <= sMin) return null;
 
-            const dv          = dragVisual?.id === block.id ? dragVisual : null;
-            const dispStart   = dv?.startMin ?? sMin;
-            const dispEnd     = dv?.endMin   ?? eMin;
-            const durMin      = dispEnd - dispStart;
-            const availW      = `calc(100% - ${HOUR_W}px - 4px)`;
+            const dv        = dragVisual?.id === block.id ? dragVisual : null;
+            const dispStart = dv?.startMin ?? sMin;
+            const dispEnd   = dv?.endMin   ?? eMin;
+            const availW    = `calc(100% - ${HOUR_W}px - 4px)`;
 
             return (
               <BlockChip
                 key={block.id}
                 block={block}
-                top={    (dispStart / 60) * pxPerHour }
-                height={ (durMin   / 60) * pxPerHour }
-                left={   `calc(${HOUR_W}px + (${availW}) * ${block.col} / ${block.cols})` }
-                width={  `calc((${availW}) / ${block.cols})` }
+                top={    (dispStart / 60) * pxPerHour}
+                height={ ((dispEnd - dispStart) / 60) * pxPerHour}
+                left={   `calc(${HOUR_W}px + (${availW}) * ${block.col} / ${block.cols})`}
+                width={  `calc((${availW}) / ${block.cols})`}
                 isDragging={!!dv}
                 onPointerDown={(e) => onBlockPointerDown(e, block)}
               />

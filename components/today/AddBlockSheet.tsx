@@ -31,11 +31,12 @@ export default function AddBlockSheet({ initialTime, editBlock, onSave, onDelete
   const defaultStart = editBlock?.start ?? initialTime ?? "09:00";
   const defaultEnd   = editBlock?.end   ?? (initialTime ? addMins(initialTime, 60) : "10:00");
 
-  const [label, setLabel] = useState(editBlock?.label ?? "");
-  const [start, setStart] = useState(defaultStart);
-  const [end,   setEnd]   = useState(defaultEnd);
-  const [kind,  setKind]  = useState<BlockKind>(editBlock?.kind ?? "deep");
-  const [done,  setDone]  = useState(editBlock?.done ?? false);
+  const [label,    setLabel]    = useState(editBlock?.label ?? "");
+  const [start,    setStart]    = useState(defaultStart);
+  const [end,      setEnd]      = useState(defaultEnd);
+  const [kind,     setKind]     = useState<BlockKind>(editBlock?.kind ?? "deep");
+  const [done,     setDone]     = useState(editBlock?.done ?? false);
+  const [timeErr,  setTimeErr]  = useState("");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -45,6 +46,11 @@ export default function AddBlockSheet({ initialTime, editBlock, onSave, onDelete
 
   function handleSave() {
     if (!label.trim()) return;
+    if (start >= end) {
+      setTimeErr("End time must be after start.");
+      return;
+    }
+    setTimeErr("");
     onSave(
       { id: editBlock?.id ?? crypto.randomUUID(), label: label.trim(), start, end, kind, done },
       isNew,
@@ -79,19 +85,21 @@ export default function AddBlockSheet({ initialTime, editBlock, onSave, onDelete
         />
 
         {/* Time row */}
-        <div className="mb-4 flex gap-3">
-          {(["From", "To"] as const).map((label, i) => (
-            <div key={label} className="flex flex-1 items-center gap-1.5 rounded-[var(--radius)] border px-2 py-2" style={border}>
-              <span className="w-6 font-mono text-[0.55rem] uppercase tracking-[0.1em] text-muted-foreground">{label}</span>
+        <div className="mb-1 flex gap-3">
+          {(["From", "To"] as const).map((fieldLabel, i) => (
+            <div key={fieldLabel} className="flex flex-1 items-center gap-1.5 rounded-[var(--radius)] border px-2 py-2" style={border}>
+              <span className="w-6 font-mono text-[0.55rem] uppercase tracking-[0.1em] text-muted-foreground">{fieldLabel}</span>
               <input
                 type="time"
                 value={i === 0 ? start : end}
-                onChange={(e) => i === 0 ? setStart(e.target.value) : setEnd(e.target.value)}
+                onChange={(e) => { if (i === 0) setStart(e.target.value); else setEnd(e.target.value); setTimeErr(""); }}
                 className="flex-1 bg-transparent font-mono text-sm outline-none"
               />
             </div>
           ))}
         </div>
+        {timeErr && <p className="mb-3 text-xs text-destructive">{timeErr}</p>}
+        {!timeErr && <div className="mb-3" />}
 
         {/* Kind pills */}
         <div className="mb-4 flex flex-wrap gap-1.5">
