@@ -14,7 +14,7 @@ export default async function LoginPage({
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (await verifySessionToken(token)) {
-    redirect("/dashboard");
+    redirect("/home");
   }
 
   const safeNext = safeInternalPath(next);

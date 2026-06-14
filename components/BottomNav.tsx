@@ -49,23 +49,23 @@ function TrackIcon() {
     </svg>
   );
 }
-function GraphIcon() {
+function BrainIcon() {
   return (
     <svg {...ICON_PROPS}>
-      <path d="M3 21h18" />
-      <rect x="5" y="11" width="3.5" height="7" rx="1" />
-      <rect x="10.25" y="6" width="3.5" height="12" rx="1" />
-      <rect x="15.5" y="13" width="3.5" height="5" rx="1" />
+      <circle cx="6" cy="6.5" r="2.2" />
+      <circle cx="18" cy="7.5" r="2.2" />
+      <circle cx="9.5" cy="18" r="2.2" />
+      <path d="M8.1 7.1l7.7-.6M7.7 8.5l1.3 7.2M16.2 9.4l-5.1 6.9" />
     </svg>
   );
 }
 
 const TABS = [
-  { href: "/dashboard", label: "Home", Icon: DashIcon },
+  { href: "/home", label: "Home", Icon: DashIcon },
   { href: "/projects", label: "Projects", Icon: BoardIcon },
   { href: "/today", label: "Today", Icon: TodayIcon },
   { href: "/tracking", label: "Track", Icon: TrackIcon },
-  { href: "/graphs", label: "Graphs", Icon: GraphIcon },
+  { href: "/brain", label: "Brain", Icon: BrainIcon },
 ];
 
 export default function BottomNav() {
@@ -84,7 +84,7 @@ export default function BottomNav() {
       <div className="mx-auto flex w-full max-w-md items-stretch justify-around px-2">
         {TABS.map(({ href, label, Icon }) => {
           const active =
-            pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}`));
+            pathname === href || (href !== "/home" && pathname.startsWith(`${href}`));
           return (
             <Link
               key={href}

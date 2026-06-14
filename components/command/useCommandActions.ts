@@ -12,11 +12,12 @@ export type Action = {
 };
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard" },
+  { href: "/home", label: "Home" },
   { href: "/projects", label: "Projects" },
   { href: "/today", label: "Today" },
   { href: "/tracking", label: "Tracking" },
   { href: "/graphs", label: "Graphs" },
+  { href: "/brain", label: "Brain" },
 ];
 
 const SECTION_FOR = { project: "Projects", task: "Tasks", metric: "Metrics" } as const;
