@@ -73,6 +73,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@theme inline {
+  --animate-slide-up: slide-up 0.22s ease-out;
+}
+
 /* The signature accent move — italic Source Serif 4 in teal */
 .accent {
   font-family: var(--font-serif);

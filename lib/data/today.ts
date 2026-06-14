@@ -17,6 +17,18 @@ function parseBlocks(value: unknown): DayBlock[] {
   return sortBlocks(value as DayBlock[]);
 }
 
+export async function getBlocksForDate(date: string): Promise<DayBlock[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("daily_plans")
+    .select("blocks")
+    .eq("date", date)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return parseBlocks(data?.blocks);
+}
+
 export async function getToday(): Promise<Today> {
   const date = todayISO();
   if (!isSupabaseConfigured()) {
