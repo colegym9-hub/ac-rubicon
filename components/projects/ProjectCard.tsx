@@ -1,12 +1,12 @@
 import Link from "next/link";
 import type { ProjectCard as ProjectCardData } from "@/lib/data/board";
 import { CATEGORY_LABELS } from "@/lib/labels";
+import { todayISO } from "@/lib/day";
 import ProgressBar from "@/components/projects/ProgressBar";
 
 function dueMeta(due: string | null): { label: string; overdue: boolean } | null {
   if (!due) return null;
-  const today = new Date().toISOString().slice(0, 10);
-  return { label: due.slice(5), overdue: due < today };
+  return { label: due.slice(5), overdue: due < todayISO() };
 }
 
 export default function ProjectCard({ project }: { project: ProjectCardData }) {

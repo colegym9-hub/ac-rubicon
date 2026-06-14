@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
-import type { DayBlock } from "@/lib/day";
+import { type DayBlock, localDateISO, todayISO } from "@/lib/day";
 
 const WINDOW_DAYS = 14;
 
@@ -18,14 +18,18 @@ export type Insights = {
   trends: TrendSeries[]; // numeric metrics over the window
 };
 
+/** Add `delta` days to an ISO date, anchoring at noon UTC so a ±day step never
+ *  slips across a DST/timezone boundary into the wrong calendar date. */
+function isoPlusDays(isoDate: string, delta: number): string {
+  const d = new Date(`${isoDate}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
 function lastNDays(n: number): string[] {
+  const today = todayISO(); // app-timezone "today"
   const out: string[] = [];
-  const today = new Date();
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    out.push(d.toISOString().slice(0, 10));
-  }
+  for (let i = n - 1; i >= 0; i--) out.push(isoPlusDays(today, -i));
   return out;
 }
 
@@ -53,7 +57,7 @@ export async function getInsights(): Promise<Insights> {
       .from("tasks")
       .select("completed_at")
       .eq("status", "done")
-      .gte("completed_at", `${cutoff}T00:00:00Z`),
+      .gte("completed_at", `${isoPlusDays(cutoff, -1)}T00:00:00Z`),
     supabase.from("daily_plans").select("date, blocks").gte("date", cutoff),
     supabase
       .from("tracking_metrics")
@@ -71,8 +75,8 @@ export async function getInsights(): Promise<Insights> {
   // Throughput
   const throughput = days.map(() => 0);
   for (const row of doneRes.data ?? []) {
-    const day = (row.completed_at ?? "").slice(0, 10);
-    const i = index.get(day);
+    if (!row.completed_at) continue;
+    const i = index.get(localDateISO(row.completed_at)); // bucket by app-tz date
     if (i !== undefined) throughput[i] += 1;
   }
 

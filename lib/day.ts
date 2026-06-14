@@ -30,16 +30,44 @@ export const BLOCK_KINDS: BlockKind[] = [
   "buffer",
 ];
 
-// NOTE (known limitation): uses the server's local date. On a UTC host (Vercel)
-// "today" can roll over before Cole's local midnight. The same UTC assumption
-// affects insights.ts day-bucketing (completed_at.slice(0,10)). Store Cole's
-// timezone before the nightly scheduler / charts depend on "today". (specs/TODO.md)
-export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+// App timezone. Cole is Eastern; override via APP_TIMEZONE if it ever changes.
+// (Previously used the host's local/UTC date, which rolled "today" over before
+// Cole's local midnight and skewed the charts — see specs/TODO.md.)
+export const APP_TZ = process.env.APP_TIMEZONE || "America/New_York";
+
+const ISO_DATE_FMT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const HHMM_FMT = new Intl.DateTimeFormat("en-GB", {
+  timeZone: APP_TZ,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+const HOUR_FMT = new Intl.DateTimeFormat("en-GB", {
+  timeZone: APP_TZ,
+  hour: "2-digit",
+  hourCycle: "h23",
+});
+
+/** Calendar date (YYYY-MM-DD) of `when` in the app timezone — accepts a Date, an
+ *  ISO timestamp string, or defaults to now. Use this for ALL day-bucketing. */
+export function localDateISO(when: Date | string = new Date()): string {
+  const d = typeof when === "string" ? new Date(when) : when;
+  return ISO_DATE_FMT.format(d); // en-CA formats as YYYY-MM-DD
 }
 
+/** Today's date (YYYY-MM-DD) in the app timezone. */
+export function todayISO(): string {
+  return localDateISO();
+}
+
+/** Current wall-clock "HH:MM" (24h) in the app timezone. */
 export function nowHHMM(): string {
-  return new Date().toTimeString().slice(0, 5);
+  return HHMM_FMT.format(new Date());
 }
 
 /** Parse "HH:MM" → minutes since midnight. Returns -1 for malformed or out-of-range. */
@@ -63,9 +91,9 @@ export function pickDoNext(blocks: DayBlock[]): DayBlock | null {
   return open.find((b) => toMinutes(b.end) > now) ?? open[0] ?? null;
 }
 
-/** "Morning" / "Afternoon" / "Evening" for greetings (server-local hour). */
-export function partOfDay(d: Date = new Date()): "Morning" | "Afternoon" | "Evening" {
-  const h = d.getHours();
+/** "Morning" / "Afternoon" / "Evening" for greetings (app-timezone hour). */
+export function partOfDay(when: Date = new Date()): "Morning" | "Afternoon" | "Evening" {
+  const h = Number(HOUR_FMT.format(when)); // 0–23 in APP_TZ
   if (h < 12) return "Morning";
   if (h < 18) return "Afternoon";
   return "Evening";
