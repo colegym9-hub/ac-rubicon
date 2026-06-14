@@ -50,14 +50,29 @@ Empty/locked states woven throughout (DB unconfigured banner; "fills in as you u
 - **Routing fork → NEEDS ME:** built at **`/dashboard`** and featured on the `/` surfaces menu. Promoting it to the root `/` landing (replacing the menu) is Cole's product call — reversible, flagged in TODO.
 - **Time range:** only the 14-day window exists today (`getInsights`). Week-vs-week works now; Month/Year segmented control deferred until more history + is gated by the DB anyway (don't ship dead controls).
 
-## Build checklist (this sprint)
+## Status — SHIPPED (commit 74046f0, verified 2026-06-14)
 
 - [x] `lib/dashboard.ts` — pure derivations (delta, streak, week*, counts)
 - [x] `MomentumChart` in `components/graphs/Charts.tsx` — bars + cumulative line + compare line
-- [x] `partOfDay()` in `lib/day.ts` (DRY the greeting; refactor `today/page.tsx`)
-- [x] `components/dashboard/` — StatStrip, ComparisonGrid, TodayCard, TrackingGlance, QuickActions
-- [x] `app/dashboard/page.tsx` — assemble + empty states
-- [x] Feature on `app/page.tsx` menu
-- [ ] Verify: build/lint green + browser preview (dev gate: password `rubicon-dev`)
-- [ ] @reviewer pass before calling it done
-- [ ] NEEDS ME: promote to root `/`? · later: ⌘K palette, Month/Year ranges, check-off inline
+- [x] `partOfDay()` in `lib/day.ts` (DRY; `today/page.tsx` refactored)
+- [x] `components/dashboard/` — StatStrip, ComparisonGrid, TodayCard, TrackingGlance
+- [x] `app/dashboard/page.tsx` — assembled + empty / not-configured states
+- [x] **Dashboard is the root landing** — `/` → `redirect("/dashboard")` (Cole's call; resolved the routing fork)
+- [x] **Bottom tab bar** (`components/BottomNav.tsx`, co-built) — 5 tabs, active state, glass; wired in `app/layout.tsx`. Replaces the old card menu + the QuickActions chips.
+- [x] Verified: `tsc --noEmit` clean; all routes 200 against the **live DB** (empty state); tab bar on every page. (Screenshot tool hangs on `backdrop-blur`, so verified via DOM + computed-style checks.)
+- [x] @reviewer pass — no criticals.
+- [x] Fixed from review: named priorities on `/today` (`priorityLabel`); pruned dead `activeProjectCount`; `halves()` length guard.
+
+## Review follow-ups (Cole's call / next iteration)
+
+- [ ] **`QuickActions.tsx` orphaned** — committed but unused (tab bar superseded it). Delete (needs Cole's OK per CLAUDE.md "never delete without asking") or repurpose for a future ⌘K / quick-add surface.
+- [ ] Header "home" links on graphs/projects/tracking/today point to `/` (one redirect hop) — repoint to `/dashboard`, or remove since the tab bar now owns Home nav (design call).
+- [ ] `BottomNav` `/login` guard is exact-match → use `startsWith("/login")` for future sub-routes.
+- [ ] Label nuance: "this week" = rolling last-7d vs prior-7d (not a calendar week). Consider "last 7d / prev 7d" when Month/Year ranges land.
+
+## Later / stretch (from inspo, not yet built)
+
+- [ ] Gated "log N days to unlock trends" state (Refero pattern) when history < window.
+- [ ] ⌘K command palette + keyboard nav (Cycle pattern).
+- [ ] Month / Year / All-Time segmented ranges (needs >14d history + timezone-correct day bucketing).
+- [ ] Inline check-off on the dashboard Today card (currently read-only → links to /today).

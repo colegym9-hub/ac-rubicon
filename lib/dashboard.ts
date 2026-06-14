@@ -31,6 +31,7 @@ export function delta(current: number, previous: number): Delta {
 /** Split a series into [previous, recent] halves (recent = the tail). */
 function halves<T>(xs: T[]): [T[], T[]] {
   const h = Math.floor(xs.length / 2);
+  if (h === 0) return [[], xs]; // <2 elements: nothing prior to compare against
   return [xs.slice(0, xs.length - h), xs.slice(-h)];
 }
 
@@ -95,11 +96,6 @@ export function openTaskCount(board: Board): number {
   }
   open += board.inbox.filter((t) => t.status !== "done").length;
   return open;
-}
-
-/** Non-archived projects on the board. */
-export function activeProjectCount(board: Board): number {
-  return board.columns.reduce((n, c) => n + c.projects.length, 0);
 }
 
 /** How many of today's active metrics have been logged. */

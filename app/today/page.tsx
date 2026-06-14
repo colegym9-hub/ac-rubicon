@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getToday } from "@/lib/data/today";
 import { partOfDay } from "@/lib/day";
+import { priorityLabel } from "@/lib/labels";
 import PlanEditor from "@/components/today/PlanEditor";
 import RecapBox from "@/components/today/RecapBox";
 
@@ -72,7 +73,7 @@ export default async function TodayPage() {
                   {task.title}
                 </span>
                 <span className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground">
-                  P{task.priority} · {task.effort}
+                  {priorityLabel(task.priority)} · {task.effort}
                 </span>
               </li>
             ))}
