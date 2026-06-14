@@ -1,16 +1,10 @@
 import Link from "next/link";
 import { getToday } from "@/lib/data/today";
+import { partOfDay } from "@/lib/day";
 import PlanEditor from "@/components/today/PlanEditor";
 import RecapBox from "@/components/today/RecapBox";
 
 export const dynamic = "force-dynamic";
-
-function greeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Morning";
-  if (hour < 18) return "Afternoon";
-  return "Evening";
-}
 
 export default async function TodayPage() {
   const { configured, date, blocks, log, scheduledTasks } = await getToday();
@@ -21,14 +15,14 @@ export default async function TodayPage() {
   });
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-5 py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-5 pt-10 pb-24">
       <header className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
             {pretty}
           </span>
           <h1 className="text-2xl font-extrabold">
-            {greeting()}. <span className="accent">Here&apos;s the day.</span>
+            {partOfDay()}. <span className="accent">Here&apos;s the day.</span>
           </h1>
         </div>
         <Link

@@ -62,3 +62,11 @@ export function pickDoNext(blocks: DayBlock[]): DayBlock | null {
   const open = sortBlocks(blocks).filter((b) => !b.done);
   return open.find((b) => toMinutes(b.end) > now) ?? open[0] ?? null;
 }
+
+/** "Morning" / "Afternoon" / "Evening" for greetings (server-local hour). */
+export function partOfDay(d: Date = new Date()): "Morning" | "Afternoon" | "Evening" {
+  const h = d.getHours();
+  if (h < 12) return "Morning";
+  if (h < 18) return "Afternoon";
+  return "Evening";
+}

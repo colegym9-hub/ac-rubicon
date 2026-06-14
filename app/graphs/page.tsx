@@ -42,7 +42,7 @@ export default async function GraphsPage() {
   const empty = configured && totalDone === 0 && planned === 0 && trends.length === 0;
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-5 py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-5 pt-10 pb-24">
       <header className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">

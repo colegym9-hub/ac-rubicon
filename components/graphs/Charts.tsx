@@ -99,3 +99,73 @@ export function Sparkline({
     </svg>
   );
 }
+
+/**
+ * Combo chart (the fitness-app pattern): faint daily bars + a bold cumulative
+ * line for this period, with an optional dashed cumulative line for the previous
+ * period to read "this week vs last week" at a glance. Bars and line use
+ * independent scales (activity vs running total) — a deliberate dual-axis look.
+ */
+export function MomentumChart({
+  values,
+  compare,
+  height = 120,
+}: {
+  values: number[];
+  compare?: number[];
+  height?: number;
+}) {
+  const pad = 6;
+  const n = Math.max(1, values.length);
+  const cumulative = (arr: number[]): number[] => {
+    let s = 0;
+    return arr.map((v) => (s += v));
+  };
+  const cur = cumulative(values);
+  const cmp = compare && compare.length ? cumulative(compare) : null;
+
+  const maxBar = Math.max(1, ...values);
+  const maxLine = Math.max(1, cur[cur.length - 1] ?? 0, cmp ? cmp[cmp.length - 1] ?? 0 : 0);
+  const bw = (W - pad * 2) / n;
+  const inner = height - pad * 2;
+
+  const cx = (i: number) => pad + (i + 0.5) * bw;
+  const ly = (v: number) => pad + (1 - v / maxLine) * inner;
+  const linePath = (arr: number[]) =>
+    arr.map((v, i) => `${i ? "L" : "M"}${cx(i).toFixed(1)} ${ly(v).toFixed(1)}`).join(" ");
+
+  return (
+    <svg viewBox={`0 0 ${W} ${height}`} className="h-auto w-full" role="img" aria-label="Momentum: daily completions with cumulative trend vs previous period">
+      {values.map((v, i) => {
+        const h = (v / maxBar) * inner;
+        return (
+          <rect
+            key={i}
+            x={pad + i * bw + 1}
+            y={pad + inner - h}
+            width={Math.max(1, bw - 2)}
+            height={h}
+            rx={1}
+            fill="var(--color-muted)"
+          />
+        );
+      })}
+      {cmp ? (
+        <path
+          d={linePath(cmp)}
+          fill="none"
+          stroke="var(--color-muted-foreground)"
+          strokeWidth={1.5}
+          strokeDasharray="3 3"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          opacity={0.7}
+        />
+      ) : null}
+      <path d={linePath(cur)} fill="none" stroke="var(--color-primary)" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+      {cur.map((v, i) => (
+        <circle key={i} cx={cx(i)} cy={ly(v)} r={2} fill="var(--color-primary)" />
+      ))}
+    </svg>
+  );
+}
