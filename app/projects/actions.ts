@@ -2,44 +2,26 @@
 
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import type {
-  ProgressMode,
-  ProjectCategory,
-  ProjectStatus,
-  ProjectUpdate,
-  TaskEffort,
-} from "@/lib/database.types";
-
-const CATEGORIES: ProjectCategory[] = ["finite", "system", "habit", "later"];
-const EFFORTS: TaskEffort[] = ["quick", "slot", "deep"];
-const PROJECT_STATUSES: ProjectStatus[] = ["active", "someday", "done", "archived"];
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import type { ProgressMode, ProjectStatus, ProjectUpdate } from "@/lib/database.types";
+import {
+  asCategory,
+  asDate,
+  clampPriority,
+  clampProgress,
+  PROJECT_STATUSES,
+} from "@/lib/data/validate";
+import {
+  insertTask,
+  scheduleTaskToday,
+  setTaskDone,
+  updateTaskPriority,
+} from "@/lib/data/mutations";
 
 export type ActionResult = { error?: string };
 
 // Revalidate the board AND every nested project detail page.
 function refresh() {
   revalidatePath("/projects", "layout");
-}
-
-function clampPriority(value: unknown): number {
-  const p = Math.round(Number(value));
-  if (!Number.isFinite(p)) return 3;
-  return Math.min(5, Math.max(1, p));
-}
-
-function clampProgress(value: unknown): number {
-  const p = Math.round(Number(value));
-  if (!Number.isFinite(p)) return 0;
-  return Math.min(100, Math.max(0, p));
-}
-
-function asCategory(value: unknown): ProjectCategory | null {
-  return CATEGORIES.includes(value as ProjectCategory) ? (value as ProjectCategory) : null;
-}
-
-function asDate(value: unknown): string | null {
-  return typeof value === "string" && DATE_RE.test(value) ? value : null;
 }
 
 // ── Projects ────────────────────────────────────────────────────────────────
@@ -132,6 +114,9 @@ export async function deleteProject(id: string): Promise<void> {
 }
 
 // ── Tasks ─────────────────────────────────────────────────────────────────
+// Write logic lives in lib/data/mutations.ts (shared with the MCP tools); these
+// server actions are thin wrappers that add page revalidation. deleteTask stays
+// here (intentionally not exposed via MCP).
 
 export async function createTask(input: {
   title: string;
@@ -140,53 +125,26 @@ export async function createTask(input: {
   effort?: string;
   due?: string | null;
 }): Promise<ActionResult> {
-  const title = input.title?.trim();
-  if (!title) return { error: "Task title is required." };
-
-  const effort = EFFORTS.includes(input.effort as TaskEffort) ? (input.effort as TaskEffort) : "slot";
-
-  const supabase = createServiceClient();
-  const { error } = await supabase.from("tasks").insert({
-    title,
-    project_id: input.projectId ?? null,
-    priority: clampPriority(input.priority ?? 3),
-    effort,
-    due: asDate(input.due),
-  });
-  if (error) return { error: error.message };
-
-  refresh();
-  return {};
+  const res = await insertTask(input);
+  if (!res.error) refresh();
+  return res;
 }
 
 export async function toggleTaskDone(id: string, done: boolean): Promise<void> {
-  const supabase = createServiceClient();
-  const { error } = await supabase
-    .from("tasks")
-    .update({
-      status: done ? "done" : "todo",
-      completed_at: done ? new Date().toISOString() : null,
-    })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  const res = await setTaskDone(id, done);
+  if (res.error) throw new Error(res.error);
   refresh();
 }
 
 export async function setTaskPriority(id: string, priority: number): Promise<void> {
-  const supabase = createServiceClient();
-  const { error } = await supabase
-    .from("tasks")
-    .update({ priority: clampPriority(priority) })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  const res = await updateTaskPriority(id, priority);
+  if (res.error) throw new Error(res.error);
   refresh();
 }
 
 export async function sendTaskToToday(id: string): Promise<void> {
-  const supabase = createServiceClient();
-  const today = new Date().toISOString().slice(0, 10);
-  const { error } = await supabase.from("tasks").update({ scheduled_for: today }).eq("id", id);
-  if (error) throw new Error(error.message);
+  const res = await scheduleTaskToday(id);
+  if (res.error) throw new Error(res.error);
   refresh();
 }
 

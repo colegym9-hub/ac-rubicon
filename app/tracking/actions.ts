@@ -3,38 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { MetricType } from "@/lib/database.types";
-import { todayISO } from "@/lib/day";
+import { writeMetricValue } from "@/lib/data/mutations";
 
 export type ActionResult = { error?: string };
 
 const TYPES: MetricType[] = ["bool", "count", "scale", "duration", "note"];
 
-/** Upsert today's entry for a metric. Only the provided fields are written, so
- *  toggling a value never clobbers an existing note (PostgREST merge-duplicates
- *  only SETs columns present in the payload). */
+/** Upsert today's entry for a metric. Logic lives in lib/data/mutations.ts
+ *  (shared with the MCP set_metric_value tool); this wrapper adds revalidation. */
 export async function setMetricValue(
   metricId: string,
   value: { valueNum?: number | null; valueText?: string | null },
 ): Promise<ActionResult> {
-  const row: {
-    metric_id: string;
-    date: string;
-    value_num?: number | null;
-    value_text?: string | null;
-  } = { metric_id: metricId, date: todayISO() };
-
-  if (value.valueNum !== undefined) row.value_num = value.valueNum;
-  if (value.valueText !== undefined) {
-    row.value_text = value.valueText && value.valueText.trim() ? value.valueText.trim() : null;
-  }
-
-  const supabase = createServiceClient();
-  const { error } = await supabase
-    .from("tracking_entries")
-    .upsert(row, { onConflict: "metric_id,date" });
-  if (error) return { error: error.message };
-  revalidatePath("/tracking");
-  return {};
+  const res = await writeMetricValue(metricId, value);
+  if (!res.error) revalidatePath("/tracking");
+  return res;
 }
 
 export async function createMetric(input: {

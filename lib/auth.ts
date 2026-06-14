@@ -52,8 +52,9 @@ async function hmac(data: string): Promise<string> {
   return toBase64Url(new Uint8Array(sig));
 }
 
-/** Constant-time string compare — no early exit, no length-based timing leak. */
-function safeEqual(a: string, b: string): boolean {
+/** Constant-time string compare — no early exit, no length-based timing leak.
+ *  Exported for reuse by the MCP bearer-token check (lib/mcp/auth.ts). */
+export function safeEqual(a: string, b: string): boolean {
   const len = Math.max(a.length, b.length);
   let result = a.length ^ b.length; // nonzero if lengths differ
   for (let i = 0; i < len; i++) {

@@ -23,6 +23,11 @@
 - [x] Tasks: create/edit with priority (1–5), effort (quick/slot/deep), status, due, nullable project (Inbox for one-offs). **BUILT** — `createTask` + `TaskRow` controls; one-off tasks (project_id null) land in Inbox.
 - [x] Effective-weight view + sort tasks by weight / due / status. **DONE** — `task_weights` view live + verified; `getBoard` orders by weight desc.
 - [x] Projects/Tasks screen: fast inline add, check-off (sets `completed_at`), priority change, "send to Today" (sets `scheduled_for`). **BUILT** — phone-first, design tokens, inline add with Enter-to-submit. (A task list — NOT a block editor.)
+- [x] Projects redesigned as Notion-style priority board (board columns by priority, cards with drag-and-drop reorder).
+- [x] Drag-and-drop priority between board columns — dropping a card into a column updates its priority in the DB.
+- [x] Dashboard as landing page + bottom tab navigation (Today / Projects / Tracking / Graphs).
+- [x] Command palette (Ctrl/Cmd-K) + mobile search button — global shortcut to jump to tasks/projects; login-guarded; error handling hardened.
+- [x] Gated trends on Graphs — "log N days to unlock" gate with progress bar + teaser chart.
 
 ---
 
@@ -30,10 +35,16 @@
 
 - **M2 — Today / Scheduler** (in progress):
   - [x] Today view shell: date + greeting, "Do Next" hero, manually-editable time-block timeline (add/check-off/remove), scheduled-for-today task list, evening recap box → `daily_logs`. Built + rendered (200). `daily_plans`/`daily_logs` data layer + upsert actions done.
-  - [ ] **NEEDS ME (architecture fork) — the AI scheduler.** PLAN says "nightly Supabase **edge function** → Claude + Calendar(MCP) + WHOOP(MCP) → plan + ntfy push." Problem: a deployed Supabase edge function **cannot reach the connected MCP servers** (they're attached to the Claude Code session, not Supabase). Decide the runtime — see NEEDS ME. Needs `ANTHROPIC_API_KEY` + `NTFY_TOPIC`.
-  - [ ] WHOOP recovery chip + Calendar next-event on the Today view (depends on the same runtime decision).
-  - [ ] "Re-plan from now" (depends on the scheduler existing).
-  - [ ] Timezone: `todayISO()` (and `insights.ts` day-bucketing via `completed_at.slice(0,10)`) use server-local/UTC dates — store Cole's TZ before the nightly job or charts rely on "today". Flagged by @reviewer.
+  - [x] Google Calendar-style planning view (CalendarView) with drag-to-resize/create blocks and day timeline. Reviewer corrections applied.
+  - [x] RecapSheet component (`components/today/RecapSheet.tsx`) — evening recap UI wired to daily_logs.
+  - [x] **AI scheduler runtime decided: Claude Code scheduled routine** (`routines/plan-my-day.md` written). Routine calls `get_planning_context` via the app MCP, designs the day, and saves via `save_day_plan`. Skips if Cole hand-edited today (`todayPlanSource === "edited"`). Delivery is in-app (no `ntfy`); the routine IS Claude Code so **no `ANTHROPIC_API_KEY`** — it just needs `MCP_BEARER_TOKEN` in `.env.local` + the MCP connected. See `routines/README.md`.
+  - [x] Planning context data layer (`lib/data/planning.ts`) — `getPlanningContext` returns date, lastRecap, scheduledToday, topTasks, activeProjects, activeMetrics, recentAdherence in one call.
+  - [x] App MCP server (`app/api/[transport]/route.ts` + `lib/mcp/`) — bearer-token-authenticated remote MCP with read + safe-write tools (get_planning_context, save_day_plan, send_task_to_today, write_recap, etc.).
+  - [ ] **NEEDS ME: activate the nightly routine.** Add `MCP_BEARER_TOKEN` to `.env.local` + connect the MCP, then use `/schedule` to register `routines/plan-my-day.md` as a cron (~05:00 Eastern). The cloud cron also needs the Vercel deploy. Full steps: `routines/README.md`.
+  - [ ] WHOOP recovery chip + Calendar next-event on the Today view. Both deferred until after the routine is live; will add a WHOOP-read step and GCal-read step to `plan-my-day.md` once credentials are wired.
+  - [ ] **NEEDS ME (backlog): Google Calendar sync on the timeline.** Read-only import of GCal events as fixed blocks. Needs Google Calendar OAuth credentials. Deferred until after scheduler is live.
+  - [ ] "Re-plan from now" button on Today view (depends on the scheduler existing).
+  - [x] **Timezone — FIXED (2026-06-14).** `lib/day.ts` centralizes `APP_TZ` (America/New_York, override via `APP_TIMEZONE`); `todayISO`/`nowHHMM`/`partOfDay` + `insights.ts` buckets are Eastern + DST-safe via `Intl`. `ProjectCard` due-compare too.
 - [x] **M3 — Tracking logger:** one-tap metrics (bool/count/scale/duration/note) + expand-to-notes + add-a-metric. **BUILT** — `/tracking`, build+render verified; live save needs the service-role key.
 - [x] **M4 — Graphs:** task throughput + plan-adherence (planned vs done) + numeric-metric trend sparklines, dependency-free SVG. **BUILT** — `/graphs`, build+render verified. (Mood-vs-WHOOP-recovery overlay deferred — needs WHOOP data ingestion.)
 - [ ] Later (out of v1 scope): M5 phone capture · M6 brain→scheduler · M7 coach · M8 native iOS app.
@@ -50,11 +61,7 @@
   - **DECISION 2026-06-13:** Cole wants to provision under a **`cole-personal`** org. BUT that org is **NOT reachable** by the connected Supabase MCP — `list_organizations` (authed as `supabase@caius.org`) returns only **A.C Media**. **ACTION (Cole):** in your Claude client, reconnect the Supabase MCP integration under the account that owns `cole-personal` (likely `colegym9@gmail.com`). Once it appears in `list_organizations`, I create `ac-rubicon` there (its own free-project quota) and proceed. No code change needed on my side.
 - [ ] **NEEDS ME: confirm secret env values** (I left them as placeholders in `.env.local`; I never write real secrets). After provisioning you'll add: `SUPABASE_SERVICE_ROLE_KEY` (Supabase dashboard → Settings → API), `APP_PASSWORD` (your chosen gate password), `SESSION_SECRET` (any long random string — `openssl rand -base64 32`). `ANTHROPIC_API_KEY` + `NTFY_TOPIC` are M2, not needed yet. See `.env.local` comments.
 - [ ] **NEEDS ME: GitHub (you chose "set up, leave push to me").** No `gh`/remote available to me. When ready: create an empty private repo `ac-rubicon` on GitHub, then run the one-liner I'll leave in the final summary to push `feature/m0-foundation`.
-- [ ] **NEEDS ME (M2 architecture fork): where does the nightly AI scheduler run?** A deployed Supabase edge function can't call the connected WHOOP/Calendar MCP servers. Options:
-  1. **Claude Code scheduled routine** (the `schedule` skill / cron) running on your machine or the cloud agent — MCPs ARE available here, so it can read Calendar + WHOOP via MCP, call Claude, write `daily_plans`, and push via ntfy. Closest to the original plan, least new integration. *Recommended.*
-  2. **Supabase edge function** with **direct REST integrations** (Google Calendar API + WHOOP API OAuth tokens stored as secrets, + Anthropic API). More setup + secret management; no MCPs.
-  3. **Next.js route + Vercel Cron** — similar to (2), also needs direct API integrations.
-  Pick one and I'll build it. All need `ANTHROPIC_API_KEY` (+ `NTFY_TOPIC` for push); options 2/3 also need Google/WHOOP API credentials.
+- [x] **M2 architecture fork DECIDED: Claude Code scheduled routine.** Routine written at `routines/plan-my-day.md`; app MCP server built. Still needs: (a) `ANTHROPIC_API_KEY` + `NTFY_TOPIC` in `.env.local`; (b) `/schedule` to register the cron.
 - [ ] **NEEDS ME: confirm auth/RLS model.** I implemented the secure default for a password-gated app: **all DB access server-side via the service-role key; RLS enabled deny-by-default (no anon access).** The browser never holds a Supabase client. Confirm this, or say if you'd rather use the public anon key client-side (simpler to test, less secure — not recommended).
 
 ---
