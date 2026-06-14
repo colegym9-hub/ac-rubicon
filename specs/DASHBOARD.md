@@ -65,14 +65,14 @@ Empty/locked states woven throughout (DB unconfigured banner; "fills in as you u
 
 ## Review follow-ups (Cole's call / next iteration)
 
-- [ ] **`QuickActions.tsx` orphaned** — committed but unused (tab bar superseded it). Delete (needs Cole's OK per CLAUDE.md "never delete without asking") or repurpose for a future ⌘K / quick-add surface.
+- [x] **`QuickActions.tsx`** — deleted (Cole didn't want it; the ⌘K palette is the proper version of the idea).
 - [ ] Header "home" links on graphs/projects/tracking/today point to `/` (one redirect hop) — repoint to `/dashboard`, or remove since the tab bar now owns Home nav (design call).
 - [ ] `BottomNav` `/login` guard is exact-match → use `startsWith("/login")` for future sub-routes.
 - [ ] Label nuance: "this week" = rolling last-7d vs prior-7d (not a calendar week). Consider "last 7d / prev 7d" when Month/Year ranges land.
 
 ## Later / stretch (from inspo, not yet built)
 
-- [ ] Gated "log N days to unlock trends" state (Refero pattern) when history < window.
-- [ ] ⌘K command palette + keyboard nav (Cycle pattern).
+- [ ] **Gated "log N days to unlock trends"** (Refero pattern) — keep momentum/comparison always-present, gate deeper per-metric trends behind a day threshold with a progress indicator. **(building next)**
+- [x] **⌘K / Ctrl-K command palette** + mobile search FAB (Cycle pattern) — fuzzy search projects/tasks/metrics, quick-add task to Inbox, commands + navigation, full keyboard nav. `components/command/CommandPalette.tsx` + `app/command/actions.ts`, mounted globally in `app/layout.tsx`.
 - [ ] Month / Year / All-Time segmented ranges (needs >14d history + timezone-correct day bucketing).
 - [ ] Inline check-off on the dashboard Today card (currently read-only → links to /today).
