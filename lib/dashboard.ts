@@ -114,3 +114,15 @@ export function noHistory(insights: Insights): boolean {
     insights.trends.every((t) => t.points.every((p) => p == null))
   );
 }
+
+/** Days of logging needed before the deeper per-metric trends "unlock". */
+export const UNLOCK_DAYS = 5;
+
+/** Distinct days in the window with ≥1 numeric metric value — gates the trends. */
+export function daysLogged(insights: Insights): number {
+  let count = 0;
+  for (let i = 0; i < insights.days.length; i++) {
+    if (insights.trends.some((t) => t.points[i] != null)) count += 1;
+  }
+  return count;
+}

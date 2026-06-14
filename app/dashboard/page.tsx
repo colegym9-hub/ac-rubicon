@@ -21,6 +21,7 @@ import StatStrip from "@/components/dashboard/StatStrip";
 import ComparisonGrid, { type Comparison } from "@/components/dashboard/ComparisonGrid";
 import TodayCard from "@/components/dashboard/TodayCard";
 import TrackingGlance from "@/components/dashboard/TrackingGlance";
+import TrendsCard from "@/components/dashboard/TrendsCard";
 import { logout } from "@/app/login/actions";
 
 export const dynamic = "force-dynamic";
@@ -157,6 +158,8 @@ export default async function DashboardPage() {
       </section>
 
       <TrackingGlance tracking={tracking} />
+
+      <TrendsCard insights={insights} />
     </main>
   );
 }
