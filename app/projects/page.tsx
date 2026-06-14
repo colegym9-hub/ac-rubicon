@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getBoard } from "@/lib/data/board";
 import AddProject from "@/components/projects/AddProject";
 import AddTask from "@/components/projects/AddTask";
-import ProjectCard from "@/components/projects/ProjectCard";
+import DraggableBoard from "@/components/projects/DraggableBoard";
 import TaskRow from "@/components/projects/TaskRow";
 
 export const dynamic = "force-dynamic";
@@ -43,34 +43,8 @@ export default async function ProjectsPage() {
 
       <AddProject />
 
-      {/* Priority board — columns scroll horizontally (swipe), cards tap to open. */}
-      <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2">
-        {columns.map((col) => (
-          <section
-            key={col.value}
-            className="flex w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col gap-2"
-          >
-            <div className="flex items-baseline justify-between">
-              <h2 className="font-mono text-[0.65rem] uppercase tracking-[0.25em] text-muted-foreground">
-                {col.label}
-              </h2>
-              <span className="font-mono text-[0.6rem] text-muted-foreground">
-                {col.projects.length}
-              </span>
-            </div>
-            {col.projects.length > 0 ? (
-              col.projects.map((project) => <ProjectCard key={project.id} project={project} />)
-            ) : (
-              <p
-                className="rounded-[var(--radius)] border border-dashed p-3 text-center text-xs text-muted-foreground"
-                style={{ borderColor: "var(--glass-border)" }}
-              >
-                —
-              </p>
-            )}
-          </section>
-        ))}
-      </div>
+      {/* Priority board — drag cards between columns to reprioritize. */}
+      <DraggableBoard columns={columns} />
 
       {configured && totalProjects === 0 ? (
         <p className="text-sm text-muted-foreground">
