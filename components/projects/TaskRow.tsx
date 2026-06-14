@@ -8,6 +8,7 @@ import {
   toggleTaskDone,
 } from "@/app/projects/actions";
 import type { TaskWithWeight } from "@/lib/database.types";
+import { PRIORITY_LEVELS } from "@/lib/labels";
 
 export default function TaskRow({ task }: { task: TaskWithWeight }) {
   const [pending, start] = useTransition();
@@ -63,9 +64,9 @@ export default function TaskRow({ task }: { task: TaskWithWeight }) {
         className="shrink-0 rounded-[3px] border bg-transparent px-1 py-0.5 font-mono text-[0.65rem] text-muted-foreground outline-none"
         style={{ borderColor: "var(--glass-border)" }}
       >
-        {[1, 2, 3, 4, 5].map((p) => (
-          <option key={p} value={p} className="bg-card text-foreground">
-            P{p}
+        {PRIORITY_LEVELS.map((p) => (
+          <option key={p.value} value={p.value} className="bg-card text-foreground">
+            {p.label}
           </option>
         ))}
       </select>

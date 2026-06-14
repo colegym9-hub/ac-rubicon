@@ -2,20 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { createProject } from "@/app/projects/actions";
+import { CATEGORY_OPTIONS, PRIORITY_LEVELS } from "@/lib/labels";
 import type { ProjectCategory } from "@/lib/database.types";
-
-const CATEGORIES: { value: ProjectCategory; label: string }[] = [
-  { value: "finite", label: "Finite" },
-  { value: "system", label: "System" },
-  { value: "habit", label: "Habit" },
-  { value: "later", label: "Later" },
-];
 
 export default function AddProject() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [category, setCategory] = useState<ProjectCategory>("finite");
   const [priority, setPriority] = useState(3);
+  const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -24,12 +19,18 @@ export default function AddProject() {
     if (!value) return;
     setError(null);
     start(async () => {
-      const res = await createProject({ name: value, category, priority });
+      const res = await createProject({
+        name: value,
+        category,
+        priority,
+        dueDate: dueDate || null,
+      });
       if (res?.error) {
         setError(res.error);
         return;
       }
       setName("");
+      setDueDate("");
       setPriority(3);
       setOpen(false);
     });
@@ -42,7 +43,7 @@ export default function AddProject() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-primary"
+        className="self-start rounded-[var(--radius)] bg-primary px-4 py-2 text-sm font-bold text-primary-foreground"
       >
         + New project
       </button>
@@ -50,10 +51,7 @@ export default function AddProject() {
   }
 
   return (
-    <div
-      className="flex flex-col gap-2 rounded-[var(--radius)] border bg-card/70 p-3"
-      style={fieldStyle}
-    >
+    <div className="flex flex-col gap-2 rounded-[var(--radius)] border bg-card/70 p-3" style={fieldStyle}>
       <input
         value={name}
         autoFocus
@@ -66,22 +64,24 @@ export default function AddProject() {
         }}
         placeholder="Project name"
         disabled={pending}
-        className="bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground/50"
+        className="bg-transparent py-1 text-base font-bold outline-none placeholder:text-muted-foreground/50"
       />
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">Type</label>
         <select
-          aria-label="Category"
+          aria-label="Type"
           value={category}
           onChange={(e) => setCategory(e.target.value as ProjectCategory)}
-          className="rounded-[3px] border bg-transparent px-1 py-1 font-mono text-[0.65rem] uppercase tracking-[0.15em] text-muted-foreground outline-none"
+          className="rounded-[3px] border bg-transparent px-1 py-1 font-mono text-[0.65rem] text-muted-foreground outline-none"
           style={fieldStyle}
         >
-          {CATEGORIES.map((c) => (
+          {CATEGORY_OPTIONS.map((c) => (
             <option key={c.value} value={c.value} className="bg-card text-foreground">
               {c.label}
             </option>
           ))}
         </select>
+        <label className="font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">Priority</label>
         <select
           aria-label="Priority"
           value={priority}
@@ -89,12 +89,23 @@ export default function AddProject() {
           className="rounded-[3px] border bg-transparent px-1 py-1 font-mono text-[0.65rem] text-muted-foreground outline-none"
           style={fieldStyle}
         >
-          {[1, 2, 3, 4, 5].map((p) => (
-            <option key={p} value={p} className="bg-card text-foreground">
-              P{p}
+          {PRIORITY_LEVELS.map((p) => (
+            <option key={p.value} value={p.value} className="bg-card text-foreground">
+              {p.label}
             </option>
           ))}
         </select>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="font-mono text-[0.55rem] uppercase tracking-[0.15em] text-muted-foreground">Do by</label>
+        <input
+          aria-label="Do by date"
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          className="rounded-[3px] border bg-transparent px-1 py-1 font-mono text-xs text-muted-foreground outline-none"
+          style={fieldStyle}
+        />
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"

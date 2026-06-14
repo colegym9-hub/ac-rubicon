@@ -1,38 +1,25 @@
 import Link from "next/link";
 import { getBoard } from "@/lib/data/board";
-import type { ProjectCategory } from "@/lib/database.types";
 import AddProject from "@/components/projects/AddProject";
 import AddTask from "@/components/projects/AddTask";
-import ProjectSection from "@/components/projects/ProjectSection";
+import ProjectCard from "@/components/projects/ProjectCard";
 import TaskRow from "@/components/projects/TaskRow";
 
 export const dynamic = "force-dynamic";
 
-const CATEGORY_ORDER: { key: ProjectCategory | "none"; label: string }[] = [
-  { key: "finite", label: "Finite" },
-  { key: "system", label: "Systems" },
-  { key: "habit", label: "Habits" },
-  { key: "later", label: "Later" },
-  { key: "none", label: "Other" },
-];
-
 export default async function ProjectsPage() {
-  const { configured, projects, inbox } = await getBoard();
-
-  const groups = CATEGORY_ORDER.map((group) => ({
-    ...group,
-    projects: projects.filter((p) => (p.category ?? "none") === group.key),
-  })).filter((group) => group.projects.length > 0);
+  const { configured, columns, inbox } = await getBoard();
+  const totalProjects = columns.reduce((n, c) => n + c.projects.length, 0);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 px-5 py-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-5 px-5 py-10">
       <header className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <span className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">
             Projects / Tasks
           </span>
           <h1 className="text-2xl font-extrabold">
-            Everything, <span className="accent">prioritized.</span>
+            The <span className="accent">priority board.</span>
           </h1>
         </div>
         <Link
@@ -50,14 +37,51 @@ export default async function ProjectsPage() {
         >
           <span className="text-foreground">Not connected yet.</span> Add{" "}
           <code className="text-primary">SUPABASE_SERVICE_ROLE_KEY</code> to{" "}
-          <code>.env.local</code> to load and save your tasks.
+          <code>.env.local</code> to load and save your projects.
         </div>
       ) : null}
 
       <AddProject />
 
+      {/* Priority board — columns scroll horizontally (swipe), cards tap to open. */}
+      <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2">
+        {columns.map((col) => (
+          <section
+            key={col.value}
+            className="flex w-[78vw] max-w-[19rem] shrink-0 snap-start flex-col gap-2"
+          >
+            <div className="flex items-baseline justify-between">
+              <h2 className="font-mono text-[0.65rem] uppercase tracking-[0.25em] text-muted-foreground">
+                {col.label}
+              </h2>
+              <span className="font-mono text-[0.6rem] text-muted-foreground">
+                {col.projects.length}
+              </span>
+            </div>
+            {col.projects.length > 0 ? (
+              col.projects.map((project) => <ProjectCard key={project.id} project={project} />)
+            ) : (
+              <p
+                className="rounded-[var(--radius)] border border-dashed p-3 text-center text-xs text-muted-foreground"
+                style={{ borderColor: "var(--glass-border)" }}
+              >
+                —
+              </p>
+            )}
+          </section>
+        ))}
+      </div>
+
+      {configured && totalProjects === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No projects yet — tap <span className="text-foreground">+ New project</span> above to add
+          your first, or quick-capture a one-off task to the Inbox below.
+        </p>
+      ) : null}
+
+      {/* Inbox — one-off tasks with no project. */}
       <section
-        className="rounded-[var(--radius)] border bg-card/60 p-4 backdrop-blur-md"
+        className="flex flex-col rounded-[var(--radius)] border bg-card/60 p-4 backdrop-blur-md"
         style={{ borderColor: "var(--glass-border)" }}
       >
         <div className="flex items-baseline gap-2">
@@ -77,23 +101,6 @@ export default async function ProjectsPage() {
           <AddTask placeholder="Quick capture…" />
         </div>
       </section>
-
-      {groups.map((group) => (
-        <div key={group.key} className="flex flex-col gap-3">
-          <h2 className="font-mono text-[0.65rem] uppercase tracking-[0.25em] text-muted-foreground">
-            {group.label}
-          </h2>
-          {group.projects.map((project) => (
-            <ProjectSection key={project.id} project={project} />
-          ))}
-        </div>
-      ))}
-
-      {configured && projects.length === 0 && inbox.length === 0 ? (
-        <p className="text-center text-sm text-muted-foreground">
-          No projects yet — add one above, or quick-capture a task to the Inbox.
-        </p>
-      ) : null}
     </main>
   );
 }

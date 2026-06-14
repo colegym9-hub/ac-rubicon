@@ -4,6 +4,7 @@
 
 export type ProjectStatus = "active" | "someday" | "done" | "archived";
 export type ProjectCategory = "finite" | "system" | "habit" | "later";
+export type ProgressMode = "auto" | "manual";
 export type TaskStatus = "todo" | "doing" | "done" | "blocked" | "dropped";
 export type TaskEffort = "quick" | "slot" | "deep";
 export type MetricType = "bool" | "count" | "scale" | "duration" | "note";
@@ -22,6 +23,8 @@ export type Database = {
           category: ProjectCategory | null;
           brain_ref: string | null;
           target_date: string | null;
+          progress: number;
+          progress_mode: ProgressMode;
           created_at: string;
           updated_at: string;
         };
@@ -34,6 +37,8 @@ export type Database = {
           category?: ProjectCategory | null;
           brain_ref?: string | null;
           target_date?: string | null;
+          progress?: number;
+          progress_mode?: ProgressMode;
           created_at?: string;
           updated_at?: string;
         };
@@ -46,6 +51,8 @@ export type Database = {
           category?: ProjectCategory | null;
           brain_ref?: string | null;
           target_date?: string | null;
+          progress?: number;
+          progress_mode?: ProgressMode;
           created_at?: string;
           updated_at?: string;
         };
