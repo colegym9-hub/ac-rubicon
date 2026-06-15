@@ -29,6 +29,18 @@ export default async function SettingsPage() {
         </div>
       ) : null}
 
+      <Link
+        href="/settings/brain"
+        className="flex items-center justify-between rounded-[var(--radius)] border bg-card/50 px-3 py-3 transition-colors hover:bg-card"
+        style={{ borderColor: "var(--glass-border)" }}
+      >
+        <span>
+          <span className="block text-sm font-medium">Brain rules — CloudMD</span>
+          <span className="mt-0.5 block text-xs text-muted-foreground">How the routines convert, file, chat, and plan. Tune anytime.</span>
+        </span>
+        <span className="text-muted-foreground">→</span>
+      </Link>
+
       <section className="flex flex-col gap-3">
         <h2 className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-muted-foreground">Tracking metrics</h2>
         <p className="text-xs text-muted-foreground">

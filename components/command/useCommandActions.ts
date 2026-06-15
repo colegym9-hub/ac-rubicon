@@ -19,6 +19,7 @@ const NAV = [
   { href: "/brain", label: "Brain" },
   { href: "/tracking", label: "Tracking" },
   { href: "/settings", label: "Settings" },
+  { href: "/settings/brain", label: "Brain rules" },
 ];
 
 const SECTION_FOR = { project: "Projects", task: "Tasks", metric: "Metrics" } as const;
