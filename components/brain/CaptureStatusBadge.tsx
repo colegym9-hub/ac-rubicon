@@ -6,6 +6,7 @@ const MAP: Record<RawSourceStatus, { label: string; cls: string }> = {
   converted:  { label: "Filing",      cls: "text-amber-300 border-amber-500/40" },
   ingesting:  { label: "Filing",      cls: "text-amber-300 border-amber-500/40" },
   ingested:   { label: "Filed",       cls: "text-green-300 border-green-500/40" },
+  needs_review: { label: "Needs review", cls: "text-yellow-300 border-yellow-500/50" },
   error:      { label: "Error",       cls: "text-red-300 border-red-500/40" },
 };
 

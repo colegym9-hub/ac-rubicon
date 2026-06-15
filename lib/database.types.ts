@@ -15,7 +15,7 @@ export type PlanSource = "auto" | "edited";
 export type RawSourceType =
   | "note" | "youtube" | "instagram" | "tiktok" | "article" | "voice" | "image" | "chat_answer";
 export type RawSourceStatus =
-  | "raw" | "converting" | "converted" | "ingesting" | "ingested" | "error";
+  | "raw" | "converting" | "converted" | "ingesting" | "ingested" | "needs_review" | "error";
 export type WikiStatus = "active" | "draft" | "archived";
 export type BrainContribution = "added" | "updated" | "confirmed";
 export type BrainOperation =
@@ -590,6 +590,85 @@ export type Database = {
         };
         Relationships: [];
       };
+      brain_sops: {
+        Row: {
+          id: string;
+          key: string;
+          label: string;
+          content_md: string;
+          sort: number;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          key: string;
+          label: string;
+          content_md?: string;
+          sort?: number;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          key?: string;
+          label?: string;
+          content_md?: string;
+          sort?: number;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      project_notes: {
+        Row: {
+          id: string;
+          project_id: string;
+          content_md: string;
+          source_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          content_md: string;
+          source_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          content_md?: string;
+          source_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_notes_project_id_fkey";
+            columns: ["project_id"];
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "project_notes_source_id_fkey";
+            columns: ["source_id"];
+            referencedRelation: "raw_sources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      brain_run_lock: {
+        Row: {
+          id: boolean;
+          fired_at: string;
+        };
+        Insert: {
+          id?: boolean;
+          fired_at?: string;
+        };
+        Update: {
+          id?: boolean;
+          fired_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       task_weights: {
@@ -644,3 +723,5 @@ export type BrainReport = Database["public"]["Tables"]["brain_reports"]["Row"];
 export type BrainSnippet = Database["public"]["Tables"]["brain_snippets"]["Row"];
 export type BrainChat = Database["public"]["Tables"]["brain_chats"]["Row"];
 export type ReplanRequest = Database["public"]["Tables"]["replan_requests"]["Row"];
+export type BrainSop = Database["public"]["Tables"]["brain_sops"]["Row"];
+export type ProjectNote = Database["public"]["Tables"]["project_notes"]["Row"];
