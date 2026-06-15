@@ -18,6 +18,7 @@ import {
   writeRecap,
   type MutationResult,
 } from "@/lib/data/mutations";
+import { registerBrainTools } from "./brain-tools";
 
 /** Wrap any JSON-serializable value as an MCP text result. */
 function json(data: unknown) {
@@ -147,4 +148,7 @@ export function registerTools(server: McpServer) {
     },
     async (input) => done(await writeRecap(input)),
   );
+
+  // ── Brain / ingest tools (CloudMD-driven routines) ──────────────────────────
+  registerBrainTools(server);
 }

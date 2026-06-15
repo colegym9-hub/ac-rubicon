@@ -4,6 +4,8 @@ import { verifyMcpToken } from "@/lib/mcp/auth";
 
 // Tools call the server-only Supabase service client → must run on Node, not Edge.
 export const runtime = "nodejs";
+// convert_source can hit Supadata for a few seconds — give the function headroom.
+export const maxDuration = 60;
 
 // Streamable-HTTP MCP server. basePath "/api" + the [transport] segment serves
 // the endpoint at /api/mcp (and legacy /api/sse).
