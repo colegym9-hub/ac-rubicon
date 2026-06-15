@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isAuthed } from "@/lib/brain/auth";
 import { getCaptures } from "@/lib/data/brain";
-import { fireRoutine } from "@/lib/brain/routine";
+import { fireProcessDebounced } from "@/lib/brain/routine";
 import type { RawSourceInsert } from "@/lib/database.types";
 
 export const runtime = "nodejs";
@@ -41,6 +41,6 @@ export async function POST(req: Request) {
   const supabase = createServiceClient();
   const { data, error } = await supabase.from("raw_sources").insert(row).select("id").single();
   if (error) return new NextResponse(error.message, { status: 500 });
-  await fireRoutine("process");
+  await fireProcessDebounced();
   return NextResponse.json({ id: data.id });
 }

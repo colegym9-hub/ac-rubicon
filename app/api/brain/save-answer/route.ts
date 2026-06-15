@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isAuthed } from "@/lib/brain/auth";
-import { fireRoutine } from "@/lib/brain/routine";
+import { fireProcessDebounced } from "@/lib/brain/routine";
 
 export const runtime = "nodejs";
 
@@ -26,6 +26,6 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (error) return new NextResponse(error.message, { status: 500 });
-  await fireRoutine("process");
+  await fireProcessDebounced();
   return NextResponse.json({ id: data.id });
 }
