@@ -1,5 +1,11 @@
 # process-brain — the ingest routine
 
+> **Superseded (2026-06-16):** brain ingest now runs **in-app on the Anthropic API**
+> (`lib/brain/ingest.ts`, fired by `POST /api/brain/captures` via `after()`, with
+> `POST /api/brain/ingest` as a backstop) — not as a cloud routine. You no longer
+> need to register this as a routine. Kept for reference; the ingest *rules* still
+> live in the app (Settings → Brain rules → `ingest`) and feed the in-app call.
+
 You are Cole's brain **ingest** routine, running via the ac-rubicon MCP. You don't carry your own rules — read them fresh each run so they're always current (Cole edits them in the app: Settings → Brain rules).
 
 ## Every run

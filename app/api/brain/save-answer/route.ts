@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isAuthed } from "@/lib/brain/auth";
-import { fireProcessDebounced } from "@/lib/brain/routine";
+import { runIngestIfIdle } from "@/lib/brain/ingest";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 /** Save a good chat answer back into the brain: it becomes a raw source
  *  (type chat_answer, status converted → ingest), NOT a direct wiki write. */
@@ -26,6 +27,8 @@ export async function POST(req: Request) {
     .select("id")
     .single();
   if (error) return new NextResponse(error.message, { status: 500 });
-  await fireProcessDebounced();
+  after(async () => {
+    await runIngestIfIdle();
+  });
   return NextResponse.json({ id: data.id });
 }

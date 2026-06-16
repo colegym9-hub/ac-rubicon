@@ -31,7 +31,7 @@ Projects/tasks/tracking/plans **and** the brain (raw sources + wiki) live in Sup
 
 ## How the AI Runs (the cost model)
 
-All AI work runs as **Claude Code cloud routines** on Cole's existing subscription — fired on demand by the app (a wakeup signal; the actual request lives in a Supabase table) or on a schedule. This covers the daily planner, brain ingest (raw source → wiki, following the brain's `CLAUDE.md` rules), brain chat, the two-question re-plan, and the weekly lint + insight. **No pay-per-token Claude API key, and no OpenAI key.** Retrieval uses Postgres full-text search, not vector embeddings. The only external keys are conversion services on free tiers: **Supadata** (YouTube / Instagram / TikTok / etc. transcripts) and **Deepgram** (voice); images and handwriting are read by Claude vision inside the routine.
+AI runs in two places, split by latency. **Interactive AI — brain chat, brain ingest (raw source → wiki, following the brain's rules), and the two-question re-plan — runs in-app on the Anthropic API** (`@anthropic-ai/sdk`): the request is handled inside the Next.js route the instant Cole acts (streaming for chat; a single structured tool call for ingest + re-plan), so nothing waits on a wakeup round-trip. **Scheduled AI — the daily planner and the weekly lint + insight — runs as Claude Code cloud routines** on Cole's subscription, fired on a cron and talking to the app over the MCP server. So there's a small pay-per-token `ANTHROPIC_API_KEY` for the interactive surfaces (single-user volume, so cents) and no OpenAI key. Retrieval uses Postgres full-text search, not vector embeddings. The only other external keys are conversion services on free tiers: **Supadata** (YouTube / Instagram / TikTok / etc. transcripts) and **Deepgram** (voice); images and handwriting are read by Claude vision.
 
 ---
 
@@ -44,7 +44,7 @@ Cole actually **follows** the plan (the adherence chart shows it) and manages hi
 ## Constraints
 
 - Claude builds; Cole is a non-dev who lives in the tool and makes the product calls.
-- Stay on **Supabase free tier + Vercel hobby tier**. The AI runs on Cole's Claude subscription (≈ **$0 marginal API**). External services (Supadata / Deepgram) on free tiers.
+- Stay on **Supabase free tier + Vercel hobby tier**. Scheduled AI (daily / weekly) runs on Cole's Claude subscription via cloud routines; interactive AI (chat / ingest / re-plan) runs on a low-volume, single-user **Anthropic API key** (pay-per-token, but cents at this scale). External services (Supadata / Deepgram) on free tiers.
 - **Phone-first** (PWA before any native app); all mockups phone-framed.
 - The brain **moves to the cloud (Supabase)**: the existing ~1,244 raw sources + 29 wiki pages migrate in as the seed; ongoing capture feeds it; the local files become a cold backup. *(This supersedes the old "brain stays as-is / no re-ingest now" constraint.)*
 - Reuse the existing dark OKLCH glass/teal design tokens from the old Electron prototype.

@@ -12,8 +12,9 @@
 - **M0 / M1 / M2 / M3 / M4 shipped.** Task layer, Today/scheduler, tracking, graphs all built and DB-backed.
 - **Brain Expansion B0 → B4 all shipped** (schema, local-brain seed, Today redesign, Brain tab + 4-tab nav, MCP tools + routines).
 - **Post-B4 (B5) shipped:** CloudMD SOP editor, project notes, ingest debounce lock, and a brain-chat rewrite to the **direct Anthropic SDK with streaming** (`@anthropic-ai/sdk`).
+- **On-demand AI → direct API (2026-06-16):** brain **ingest** (`lib/brain/ingest.ts`) and **re-plan** (`lib/brain/replan.ts`) now run in-app on the Anthropic API like chat — no cloud-routine round-trip. Ingest fires from `POST /api/brain/captures` via `after()` (lock-guarded), backstopped by `POST /api/brain/ingest`; re-plan is `POST /api/today/replan`. Only the **daily planner** + **weekly** routines remain crons. Shared extractions: `lib/brain/convert.ts`, `lib/data/brain-mutations.ts` (MCP `brain-tools.ts` now delegates to these). Dead now (left in place per no-delete rule; flagged for cleanup): `lib/brain/routine.ts` + `writeReplanRequest` + the `BRAIN_*_FIRE_URL/TOKEN` env vars + the `process-brain`/`replan-day` routine files.
 - **In progress (uncommitted):** responsive sheet polish — desktop sidebar offset + slide-up animation across the bottom sheets; Markdown renderer memoized.
-- **Still pending (human-only):** Vercel deploy + PWA PNG icons; registering the cloud routines as crons; WHOOP/GCal wiring.
+- **Still pending (human-only):** Vercel deploy + PWA PNG icons; registering the **daily + weekly** routines as crons; WHOOP/GCal wiring.
 
 ---
 
@@ -21,18 +22,19 @@
 
 Threads for "Ask your brain": each chat turn now belongs to a `brain_conversations` row, so the panel can list/reopen past threads and the model gets prior-turn memory on follow-ups.
 
-- [ ] Migration `0005_brain_conversations.sql` — `brain_conversations` table + nullable `brain_chats.conversation_id` FK (file written; additive/reversible).
-- [ ] `database.types.ts` + `lib/brain/types.ts` — new table/column types + `ConversationSummary` / `ConversationDetail` view-models.
-- [ ] `lib/data/brain.ts` — `listConversations`, `getConversation` (thread + ordered turns).
-- [ ] API — `GET /api/brain/conversations`, `GET /api/brain/conversations/[id]`; `POST /api/brain/chat` rewritten to create/continue a thread, feed prior turns to Claude, and return `X-Conversation-Id`.
-- [ ] UI — `ChatView` New + History controls + thread continuation; new `ConversationList` history panel.
-- [ ] NEEDS ME: apply migration `0005` to the live Supabase project (`a-c.rubicon` / `kecpmrpugjfavdzxejxh`). Built but not applied — touching the production DB needs your OK. Approve and I'll run it via the Supabase MCP, or paste the SQL into the Supabase SQL editor yourself.
-- [ ] Verify end-to-end in the running app once the migration is applied (ask → reopen from History → follow-up uses memory).
+- [x] Migration `0005_brain_conversations.sql` — `brain_conversations` table + nullable `brain_chats.conversation_id` FK. **Applied + verified on `kecpmrpugjfavdzxejxh`** (table + column + FK index all present).
+- [x] `database.types.ts` + `lib/brain/types.ts` — new table/column types + `ConversationSummary` / `ConversationDetail` view-models.
+- [x] `lib/data/brain.ts` — `listConversations`, `getConversation` (thread + ordered turns).
+- [x] API — `GET /api/brain/conversations`, `GET /api/brain/conversations/[id]`; `POST /api/brain/chat` rewritten to create/continue a thread, feed prior turns to Claude, and return `X-Conversation-Id`.
+- [x] UI — `ChatView` New + History controls + thread continuation; new `ConversationList` history panel.
+- [x] Migration applied to the live project by Cole; verified via MCP. Shipped in `a5c77f7` + `44c945d` (review fixes: UUID guard, mid-stream history race, history-prefix caching).
+- [ ] Optional: full click-through in the running app (ask → reopen from History → follow-up uses memory). Routes confirmed serving + auth-gating; UI is type/lint/review-clean.
 
 ## Now / Next
 
 - [ ] **In progress — responsive sheet polish (uncommitted).** Bottom sheets now offset for the desktop sidebar (`md:left-52`) and slide up on open: `AddCaptureSheet`, `AddBlockSheet`, `MorningCheckIn`, `RecapSheet`, `ReplanSheet`. `lib/brain/Markdown.tsx` made a client component + `parse()` memoized. Done = commit; verify sheets sit flush against the sidebar on desktop and full-width on mobile.
-- [ ] Deploy to Vercel + register cloud routines (see **NEEDS ME — deploy** below). This is the gate on everything cloud-side (process-brain ingest, daily planner, weekly lint).
+- [ ] Deploy to Vercel + register the scheduled routines (see **NEEDS ME — deploy** below). This is the gate on the cloud-side AI (daily planner, weekly lint). On-demand AI (chat, ingest, re-plan) works as soon as `ANTHROPIC_API_KEY` is set — no routine needed.
+- [ ] Cleanup (low-risk, not blocking): delete the now-dead routine-fire layer (`lib/brain/routine.ts`), `writeReplanRequest` in `lib/data/mutations.ts`, and the superseded `routines/process-brain.md` + `routines/replan-day.md` once the in-app ingest/re-plan are confirmed in production. Left in place now per the no-delete-without-asking rule.
 
 ---
 
@@ -138,8 +140,8 @@ Threads for "Ask your brain": each chat turn now belongs to a `brain_conversatio
 ### Open
 - [ ] **NEEDS ME — DEPLOY (human-only).** Everything cloud-side waits on this:
   1. Deploy to Vercel (`main` → production) so cloud routines can reach the live app URL (routines can't hit localhost). Add PNG PWA icons 192/512 + login rate-limiting first (M0 hardening).
-  2. Add Brain env vars to Vercel: `SUPADATA_API_KEY`, `DEEPGRAM_API_KEY`, `BRAIN_ROUTINE_TOKEN`, `BRAIN_ROUTINE_FIRE_URL`, plus `ANTHROPIC_API_KEY` (for the in-app chat streaming) and `MCP_BEARER_TOKEN`.
-  3. In the Claude console, create the routines by pasting `routines/process-brain.md`, `routines/replan-day.md`, `routines/daily.md`, `routines/weekly.md`, `routines/plan-my-day.md` — connect the ac-rubicon MCP to each. (`brain-chat.md` is now in-app streaming, no longer needs a cron.)
+  2. Add Brain env vars to Vercel: `SUPADATA_API_KEY`, `DEEPGRAM_API_KEY`, `ANTHROPIC_API_KEY` (powers the in-app chat / ingest / re-plan), and `MCP_BEARER_TOKEN` (for the scheduled routines). The `BRAIN_*_FIRE_URL` / `BRAIN_*_TOKEN` vars are no longer needed — ingest + re-plan run in-app now.
+  3. In the Claude console, create only the **scheduled** routines by pasting `routines/daily.md` (or `routines/plan-my-day.md`) and `routines/weekly.md` — connect the ac-rubicon MCP to each. (`process-brain.md`, `replan-day.md`, `brain-chat.md` are now in-app on the Anthropic API — no cron.)
   4. First-run test: drop a YouTube-link capture, confirm the routine fires and status goes `pending → processing → done` and the wiki page appears.
 - [ ] **NEEDS ME: WHOOP + Google Calendar credentials** — wire WHOOP recovery + GCal events into Today + the daily routine once provided.
 

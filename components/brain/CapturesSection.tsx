@@ -11,14 +11,24 @@ interface Props {
   onAdd: () => void;
 }
 
+const DRAINABLE = ["raw", "converting", "converted", "ingesting"];
+
 export default function CapturesSection({ captures, onRefresh, onAdd }: Props) {
-  // Poll while anything is still converting/ingesting (the routine processes it).
+  // Poll while anything is still in flight; the in-app ingest files it.
   const hasPending = captures.some((c) => c.status !== "ingested" && c.status !== "error");
+  // Sources the ingest can still act on (excludes needs_review, which waits on Cole).
+  const hasDrainable = captures.some((c) => DRAINABLE.includes(c.status));
   useEffect(() => {
     if (!hasPending) return;
-    const id = setInterval(onRefresh, 10_000);
+    const tick = () => {
+      // Backstop the capture route's after() trigger (lock-guarded server-side,
+      // so this no-ops while a drain is already running).
+      if (hasDrainable) fetch("/api/brain/ingest", { method: "POST" }).catch(() => {});
+      onRefresh();
+    };
+    const id = setInterval(tick, 10_000);
     return () => clearInterval(id);
-  }, [hasPending, onRefresh]);
+  }, [hasPending, hasDrainable, onRefresh]);
 
   return (
     <section className="flex flex-col gap-2">

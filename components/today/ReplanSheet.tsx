@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { replanFromNow } from "@/app/today/actions";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Wand2 } from "lucide-react";
 
 function hoursLeftToday(): string {
   const now = new Date();
-  const rem = Math.max(0, 23 * 60 - (now.getHours() * 60 + now.getMinutes()));
+  const rem = Math.max(0, 24 * 60 - (now.getHours() * 60 + now.getMinutes()));
   const h = Math.floor(rem / 60);
   const m = rem % 60;
   if (h === 0) return `${m}m`;
@@ -23,6 +23,7 @@ export default function ReplanSheet() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const router = useRouter();
 
   function close() {
     setOpen(false);
@@ -32,13 +33,16 @@ export default function ReplanSheet() {
   }
 
   function submit() {
+    setError(null);
     start(async () => {
-      const res = await replanFromNow({
-        whatChanged: whatChanged || undefined,
-        timeLeft: hoursLeftToday(),
+      const res = await fetch("/api/today/replan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ whatChanged: whatChanged || undefined, timeLeft: hoursLeftToday() }),
       });
-      if (res?.error) { setError(res.error); return; }
+      if (!res.ok) { setError((await res.text()) || "Re-plan failed."); return; }
       setDone(true);
+      router.refresh(); // pull the freshly saved plan onto the timeline
     });
   }
 
@@ -67,8 +71,8 @@ export default function ReplanSheet() {
             {done ? (
               <div className="flex flex-col gap-3">
                 <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">On it</span>
-                <h2 className="text-xl font-extrabold leading-tight">Re-planning <span className="accent">the rest of today.</span></h2>
-                <p className="text-sm text-muted-foreground">Your updated plan will land on the timeline shortly.</p>
+                <h2 className="text-xl font-extrabold leading-tight">Re-planned <span className="accent">the rest of today.</span></h2>
+                <p className="text-sm text-muted-foreground">Your timeline is updated — close this to see it.</p>
                 <Button onClick={close} size="sm" className="mt-1 w-full">Done</Button>
               </div>
             ) : (

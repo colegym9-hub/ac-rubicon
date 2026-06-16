@@ -5,6 +5,14 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getSop } from "@/lib/data/sops";
 import { getWikiPage, searchWiki } from "@/lib/data/brain";
+import { convertSourceById } from "@/lib/brain/convert";
+import {
+  upsertWikiPage,
+  linkSourceToPage,
+  setSourceStatus,
+  appendBrainLog,
+  addProjectNote,
+} from "@/lib/data/brain-mutations";
 
 function json(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
@@ -14,54 +22,6 @@ function ok(msg = "OK") {
 }
 function fail(m: string) {
   return { content: [{ type: "text" as const, text: `Error: ${m}` }], isError: true };
-}
-
-type SupadataResp = {
-  jobId?: string;
-  content?: unknown;
-  text?: unknown;
-  status?: string;
-  error?: unknown;
-};
-
-/** App-first conversion via Supadata. Returns the transcript text, or an error
- *  (on error the routine transcribes the source itself — the agreed fallback). */
-async function supadataTranscript(url: string): Promise<{ text?: string; error?: string }> {
-  const key = process.env.SUPADATA_API_KEY;
-  if (!key) return { error: "SUPADATA_API_KEY not configured" };
-  const base = "https://api.supadata.ai/v1";
-  const headers = { "x-api-key": key };
-  const pick = (d: SupadataResp): string | null =>
-    typeof d.content === "string" ? d.content
-    : typeof d.text === "string" ? d.text
-    : Array.isArray(d.content) ? d.content.map((c) => (c as { text?: string }).text ?? "").join(" ")
-    : null;
-
-  try {
-    const res = await fetch(`${base}/transcript?url=${encodeURIComponent(url)}&text=true`, { headers });
-    if (!res.ok) return { error: `Supadata ${res.status}` };
-    let data = (await res.json()) as SupadataResp;
-
-    // Async: a job id to poll. Keep it short (Vercel timeout) — the routine
-    // falls back if it isn't ready quickly.
-    if (data.jobId) {
-      let resolved = false;
-      for (let i = 0; i < 3 && !resolved; i++) {
-        await new Promise((r) => setTimeout(r, 2500));
-        const jr = await fetch(`${base}/transcript/${data.jobId}`, { headers });
-        if (!jr.ok) continue;
-        const jd = (await jr.json()) as SupadataResp;
-        if (jd.status === "failed" || jd.error) return { error: "Supadata job failed" };
-        if (pick(jd)) { data = jd; resolved = true; }
-      }
-      if (!resolved) return { error: "Supadata still processing" };
-    }
-
-    const text = pick(data);
-    return text ? { text } : { error: "No transcript in response" };
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Supadata fetch failed" };
-  }
 }
 
 /** Brain/ingest MCP tools the routines call. All non-destructive. */
@@ -129,22 +89,9 @@ export function registerBrainTools(server: McpServer) {
     "Convert a link/video raw source to markdown via Supadata. On success, saves content_md and marks it 'converted'. On error, leaves it 'raw' and returns the error — then YOU (the routine) transcribe/extract it yourself.",
     { id: z.string() },
     async ({ id }) => {
-      const sb = createServiceClient();
-      const { data: row } = await sb.from("raw_sources").select("type, raw_input, content_md, status").eq("id", id).maybeSingle();
-      if (!row) return fail("source not found");
-      if (row.type === "note" || row.type === "chat_answer") return ok("no conversion needed");
-      if (row.content_md && row.status === "converted") return ok("already converted");
-
-      await sb.from("raw_sources").update({ status: "converting" }).eq("id", id);
-      const r = await supadataTranscript(row.raw_input);
-      if (r.error || !r.text) {
-        await sb.from("raw_sources").update({ status: "raw", error_msg: r.error ?? "no text" }).eq("id", id);
-        return fail(r.error ?? "no text");
-      }
-      await sb.from("raw_sources").update({
-        content_md: r.text, status: "converted", error_msg: null, token_est: Math.round(r.text.length / 4),
-      }).eq("id", id);
-      return ok("converted");
+      const r = await convertSourceById(id);
+      if (!r.ok) return fail(r.error);
+      return ok(r.skipped ? "no conversion needed" : "converted");
     },
   );
 
@@ -158,11 +105,8 @@ export function registerBrainTools(server: McpServer) {
       errorMsg: z.string().nullable().optional(),
     },
     async ({ id, status, errorMsg }) => {
-      const sb = createServiceClient();
-      const { error } = await sb.from("raw_sources").update({
-        status, ...(errorMsg !== undefined ? { error_msg: errorMsg } : {}),
-      }).eq("id", id);
-      return error ? fail(error.message) : ok();
+      const res = await setSourceStatus(id, status, errorMsg);
+      return res.error ? fail(res.error) : ok();
     },
   );
 
@@ -178,19 +122,8 @@ export function registerBrainTools(server: McpServer) {
       relatedSlugs: z.array(z.string()).optional(),
     },
     async ({ slug, title, domain, overview, content_md, relatedSlugs }) => {
-      const sb = createServiceClient();
-      const { data: cur } = await sb.from("wiki_pages").select("version").eq("slug", slug).maybeSingle();
-      const { error } = await sb.from("wiki_pages").upsert(
-        {
-          slug, title, domain, content_md,
-          ...(overview !== undefined ? { overview } : {}),
-          ...(relatedSlugs ? { related_slugs: relatedSlugs } : {}),
-          version: (cur?.version ?? 0) + 1,
-          last_ingested_at: new Date().toISOString(),
-        },
-        { onConflict: "slug" },
-      );
-      return error ? fail(error.message) : ok();
+      const res = await upsertWikiPage({ slug, title, domain, overview, content_md, relatedSlugs });
+      return res.error ? fail(res.error) : ok();
     },
   );
 
@@ -203,14 +136,8 @@ export function registerBrainTools(server: McpServer) {
       contribution: z.enum(["added", "updated", "confirmed"]).optional(),
     },
     async ({ sourceId, pageSlug, contribution }) => {
-      const sb = createServiceClient();
-      const { data: page } = await sb.from("wiki_pages").select("id, version").eq("slug", pageSlug).maybeSingle();
-      if (!page) return fail("page not found");
-      const { error } = await sb.from("raw_source_wiki_pages").upsert(
-        { source_id: sourceId, page_id: page.id, contribution: contribution ?? "added", page_version: page.version },
-        { onConflict: "source_id,page_id" },
-      );
-      return error ? fail(error.message) : ok();
+      const res = await linkSourceToPage({ sourceId, pageSlug, contribution });
+      return res.error ? fail(res.error) : ok();
     },
   );
 
@@ -225,11 +152,8 @@ export function registerBrainTools(server: McpServer) {
       meta: z.record(z.unknown()).optional(),
     },
     async ({ operation, summary, targetType, targetId, meta }) => {
-      const sb = createServiceClient();
-      const { error } = await sb.from("brain_log").insert({
-        operation, summary, target_type: targetType ?? null, target_id: targetId ?? null, meta: meta ?? {},
-      });
-      return error ? fail(error.message) : ok();
+      const res = await appendBrainLog({ operation, summary, targetType, targetId, meta });
+      return res.error ? fail(res.error) : ok();
     },
   );
 
@@ -238,11 +162,8 @@ export function registerBrainTools(server: McpServer) {
     "Add a background note to an active project — ONLY when a source is clearly relevant to what Cole's building. sourceId links it to the capture.",
     { projectId: z.string(), content: z.string(), sourceId: z.string().nullable().optional() },
     async ({ projectId, content, sourceId }) => {
-      const sb = createServiceClient();
-      const { error } = await sb.from("project_notes").insert({
-        project_id: projectId, content_md: content, source_id: sourceId ?? null,
-      });
-      return error ? fail(error.message) : ok();
+      const res = await addProjectNote({ projectId, content, sourceId });
+      return res.error ? fail(res.error) : ok();
     },
   );
 

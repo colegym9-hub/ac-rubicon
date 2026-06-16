@@ -51,19 +51,15 @@ SESSION_SECRET=                  # signs the session cookie (e.g. `openssl rand 
 MCP_BEARER_TOKEN=                # auth for the app MCP server at /api/[transport]; routines call in with it
 SUPADATA_API_KEY=                # transcripts: YouTube / Instagram / TikTok / X / Facebook / file URLs (free tier)
 DEEPGRAM_API_KEY=                # voice-memo transcription (free tier)
-# Brain cloud routines — one "Call via API" routine each (Cole creates + wires post-deploy).
-# fireRoutine(key) reads BRAIN_<KEY>_FIRE_URL + BRAIN_<KEY>_TOKEN; unset = no-op (queue row persists).
-BRAIN_PROCESS_FIRE_URL=          # process-brain routine (convert + ingest captures)
-BRAIN_PROCESS_TOKEN=
-BRAIN_CHAT_FIRE_URL=             # brain-chat routine (answer a queued question)
-BRAIN_CHAT_TOKEN=
-BRAIN_REPLAN_FIRE_URL=           # replan-day routine (two-question re-plan)
-BRAIN_REPLAN_TOKEN=
+ANTHROPIC_API_KEY=               # in-app AI: brain chat (streaming) + ingest + re-plan on the Anthropic API
+# Legacy — no longer used (ingest + re-plan moved in-app 2026-06-16; chat was already in-app). Safe to omit:
+#   BRAIN_PROCESS_FIRE_URL / BRAIN_PROCESS_TOKEN, BRAIN_CHAT_FIRE_URL / BRAIN_CHAT_TOKEN, BRAIN_REPLAN_FIRE_URL / BRAIN_REPLAN_TOKEN
 ```
 
-**NOT used:** `ANTHROPIC_API_KEY` / `NTFY_TOPIC` — all AI runs as Claude Code routines on Cole's
-subscription (no pay-per-token API), and there is no OpenAI key (retrieval = Postgres full-text
-search, not embeddings). Google Calendar + WHOOP are reached via their connected MCP servers.
+**AI split:** interactive AI (brain chat / ingest / re-plan) runs **in-app on `ANTHROPIC_API_KEY`**
+(`lib/brain/{ingest,replan}.ts`, `app/api/brain/chat`); scheduled AI (daily planner + weekly) runs as
+**Claude Code cloud routines** that call the app's MCP server with `MCP_BEARER_TOKEN`. No OpenAI key
+(retrieval = Postgres full-text search, not embeddings). Google Calendar + WHOOP via connected MCP servers.
 
 ---
 

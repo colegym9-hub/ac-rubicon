@@ -1,11 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isAuthed } from "@/lib/brain/auth";
 import { getCaptures } from "@/lib/data/brain";
-import { fireProcessDebounced } from "@/lib/brain/routine";
+import { runIngestIfIdle } from "@/lib/brain/ingest";
 import type { RawSourceInsert } from "@/lib/database.types";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 function linkType(url: string): RawSourceInsert["type"] {
   if (/youtube\.com|youtu\.be/i.test(url)) return "youtube";
@@ -41,6 +42,10 @@ export async function POST(req: Request) {
   const supabase = createServiceClient();
   const { data, error } = await supabase.from("raw_sources").insert(row).select("id").single();
   if (error) return new NextResponse(error.message, { status: 500 });
-  await fireProcessDebounced();
+  // Ingest in-app after the response is sent (lock-guarded so quick-succession
+  // captures = one drain). The captures list polls for the resulting status.
+  after(async () => {
+    await runIngestIfIdle();
+  });
   return NextResponse.json({ id: data.id });
 }

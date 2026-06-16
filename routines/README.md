@@ -2,6 +2,14 @@
 
 Claude Code routines that drive the app through its MCP server (`/api/mcp`).
 
+> **Cloud routines = scheduled AI only.** As of 2026-06-16 the on-demand AI
+> (brain chat, brain ingest, "re-plan from now") runs **in-app on the Anthropic
+> API**, not as routines — see `lib/brain/{ingest,replan}.ts` + `app/api/brain/chat`.
+> The only routines you still register as crons are the **daily planner**
+> (`plan-my-day.md` / `daily.md`) and the **weekly lint + insight** (`weekly.md`).
+> `process-brain.md`, `replan-day.md`, and `brain-chat.md` are kept for reference
+> but are superseded by the in-app calls.
+
 ## `plan-my-day.md` — the daily scheduler
 
 A Claude Code routine that, each morning, reads your board + last night's recap

@@ -1,9 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { writeDayPlan, writeRecap, writeReplanRequest } from "@/lib/data/mutations";
+import { writeDayPlan, writeRecap } from "@/lib/data/mutations";
 import { getBlocksForDate } from "@/lib/data/today";
-import { fireRoutine } from "@/lib/brain/routine";
 import { saveWeeklyPlan } from "@/lib/data/sops";
 import type { DayBlock } from "@/lib/day";
 
@@ -55,20 +54,4 @@ export async function updateWeeklyPlan(content: string): Promise<ActionResult> {
   }
   revalidatePath("/today");
   return {};
-}
-
-/** Queue a two-question "re-plan from now" and wake the brain routine to rewrite
- *  the rest of today's plan. Returns the request id (for optional polling). */
-export async function replanFromNow(input: {
-  whatChanged?: string;
-  timeLeft?: string;
-}): Promise<ActionResult & { id?: string }> {
-  const res = await writeReplanRequest({
-    whatChanged: input.whatChanged,
-    timeLeft: input.timeLeft,
-  });
-  if (res.error) return { error: res.error };
-  await fireRoutine("replan");
-  revalidatePath("/today");
-  return { id: res.id };
 }
