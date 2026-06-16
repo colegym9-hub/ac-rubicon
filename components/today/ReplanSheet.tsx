@@ -57,9 +57,9 @@ export default function ReplanSheet() {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-[60] bg-black/60" onClick={close} />
+          <div className="fixed inset-0 md:left-52 z-[60] bg-black/50" onClick={close} />
           <div
-            className="fixed inset-x-0 bottom-0 z-[70] rounded-t-2xl border-t bg-card px-5 pt-4 pb-10 shadow-2xl"
+            className="fixed left-0 md:left-52 right-0 bottom-0 z-[70] rounded-t-2xl border-t bg-card px-5 pt-4 pb-10 shadow-2xl animate-slide-up"
             style={border}
           >
             <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />

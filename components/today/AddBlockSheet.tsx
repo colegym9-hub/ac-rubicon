@@ -62,9 +62,9 @@ export default function AddBlockSheet({ initialTime, editBlock, onSave, onDelete
 
   return (
     <>
-      <div className="fixed inset-0 z-[60] bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 md:left-52 z-[60] bg-black/50" onClick={onClose} />
       <div
-        className="fixed inset-x-0 bottom-0 z-[70] rounded-t-2xl border-t bg-card px-4 pb-10 pt-4 shadow-2xl animate-slide-up"
+        className="fixed left-0 md:left-52 right-0 bottom-0 z-[70] rounded-t-2xl border-t bg-card px-4 pb-10 pt-4 shadow-2xl animate-slide-up"
         style={border}
       >
         {/* Drag pill */}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type Anthropic from "@anthropic-ai/sdk";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isAuthed } from "@/lib/brain/auth";
 import { searchWiki } from "@/lib/data/brain";
@@ -14,13 +15,36 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const question = String(body?.question ?? "").trim();
   if (!question) return new NextResponse("Empty question", { status: 400 });
+  const incomingConversationId = body?.conversationId ? String(body.conversationId) : null;
 
   const supabase = createServiceClient();
 
-  // Insert chat row for history (no fireRoutine — we answer inline now).
+  // Resolve the thread this turn belongs to — create one on the first message.
+  let conversationId = incomingConversationId;
+  if (!conversationId) {
+    const title = question.length > 80 ? `${question.slice(0, 79)}…` : question;
+    const { data: convo, error: convoError } = await supabase
+      .from("brain_conversations")
+      .insert({ title })
+      .select("id")
+      .single();
+    if (convoError) return new NextResponse(convoError.message, { status: 500 });
+    conversationId = convo.id;
+  }
+
+  // Prior answered turns become the model's memory for follow-ups (oldest first).
+  const { data: priorRows } = await supabase
+    .from("brain_chats")
+    .select("question, answer")
+    .eq("conversation_id", conversationId)
+    .eq("status", "answered")
+    .order("created_at", { ascending: true });
+  const priorTurns = (priorRows ?? []).filter((r) => r.answer);
+
+  // Insert this turn's row for history.
   const { data: chatRow, error: insertError } = await supabase
     .from("brain_chats")
-    .insert({ question, status: "pending" })
+    .insert({ question, status: "pending", conversation_id: conversationId })
     .select("id")
     .single();
   if (insertError) return new NextResponse(insertError.message, { status: 500 });
@@ -52,6 +76,20 @@ export async function POST(req: Request) {
     sop?.content_md ??
     "You are a personal knowledge assistant. Answer concisely and accurately using only the provided wiki context. If the context doesn't cover the question, say so.";
 
+  // Prior turns first (memory), then the current question with fresh wiki context.
+  const messages: Anthropic.MessageParam[] = [];
+  for (const t of priorTurns) {
+    messages.push({ role: "user", content: t.question });
+    messages.push({ role: "assistant", content: t.answer! });
+  }
+  messages.push({
+    role: "user",
+    content: [
+      { type: "text", text: wikiContext },
+      { type: "text", text: `Question: ${question}` },
+    ],
+  });
+
   // Build the streaming response.
   const encoder = new TextEncoder();
   let fullAnswer = "";
@@ -69,22 +107,7 @@ export async function POST(req: Request) {
               cache_control: { type: "ephemeral" },
             },
           ],
-          messages: [
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: wikiContext,
-                  cache_control: { type: "ephemeral" },
-                },
-                {
-                  type: "text",
-                  text: `Question: ${question}`,
-                },
-              ],
-            },
-          ],
+          messages,
         });
 
         for await (const event of anthropicStream) {
@@ -112,6 +135,11 @@ export async function POST(req: Request) {
               : { answer: fullAnswer, status: "answered" },
           )
           .eq("id", chatId);
+        // Bump the thread so it sorts to the top of the history list.
+        await supabase
+          .from("brain_conversations")
+          .update({ updated_at: new Date().toISOString() })
+          .eq("id", conversationId);
       }
     },
   });
@@ -120,6 +148,7 @@ export async function POST(req: Request) {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "X-Chat-Id": chatId,
+      "X-Conversation-Id": conversationId,
     },
   });
 }

@@ -3,15 +3,19 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type { ChatTurn } from "@/lib/brain/types";
 import ChatMessage from "./ChatMessage";
+import ConversationList from "./ConversationList";
 import { Input } from "@/components/ui/input";
-import { X, Send } from "lucide-react";
+import { X, Send, SquarePen, History } from "lucide-react";
 
 export default function ChatView({ onClose }: { onClose: () => void }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const abort = useCallback(() => {
     readerRef.current?.cancel();
@@ -31,7 +35,7 @@ export default function ChatView({ onClose }: { onClose: () => void }) {
       const res = await fetch("/api/brain/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify(conversationId ? { question, conversationId } : { question }),
       });
       if (!res.ok) {
         const msg = await res.text();
@@ -39,6 +43,11 @@ export default function ChatView({ onClose }: { onClose: () => void }) {
         setBusy(false);
         return;
       }
+
+      // First message of a thread returns the new conversation id — keep it so
+      // follow-ups continue the same thread (and the model gets prior-turn memory).
+      const convoId = res.headers.get("X-Conversation-Id");
+      if (convoId) setConversationId(convoId);
 
       const chatId = res.headers.get("X-Chat-Id") ?? tempId;
       // Promote the temp turn to the real DB id and switch to streaming state
@@ -49,7 +58,6 @@ export default function ChatView({ onClose }: { onClose: () => void }) {
       readerRef.current = reader;
       const decoder = new TextDecoder();
 
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -87,45 +95,80 @@ export default function ChatView({ onClose }: { onClose: () => void }) {
     } catch { /* best-effort */ }
   }, []);
 
+  function newChat() {
+    if (busy) return;
+    setTurns([]);
+    setConversationId(null);
+    setShowHistory(false);
+    inputRef.current?.focus();
+  }
+
+  async function selectConversation(id: string) {
+    setShowHistory(false);
+    try {
+      const res = await fetch(`/api/brain/conversations/${id}`);
+      if (!res.ok) return;
+      const detail: { turns: ChatTurn[] } = await res.json();
+      setTurns(detail.turns ?? []);
+      setConversationId(id);
+      inputRef.current?.focus();
+    } catch { /* best-effort */ }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background md:left-52">
       <header className="flex shrink-0 items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--glass-border)" }}>
         <h2 className="text-base font-bold">Ask your brain</h2>
-        <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground">
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={newChat} disabled={busy} aria-label="New chat" className="text-muted-foreground hover:text-foreground disabled:opacity-40">
+            <SquarePen className="h-5 w-5" />
+          </button>
+          <button type="button" onClick={() => setShowHistory((v) => !v)} aria-label="History" className="text-muted-foreground hover:text-foreground">
+            <History className="h-5 w-5" />
+          </button>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-        {turns.length === 0 ? (
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            Ask anything across your wiki, projects, and plans.
-          </p>
-        ) : (
-          turns.map((t) => <ChatMessage key={t.id} turn={t} onSave={saveAnswer} />)
-        )}
-        <div ref={endRef} />
-      </div>
+      {showHistory ? (
+        <ConversationList onSelect={selectConversation} onClose={() => setShowHistory(false)} />
+      ) : (
+        <>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+            {turns.length === 0 ? (
+              <p className="mt-8 text-center text-sm text-muted-foreground">
+                Ask anything across your wiki, projects, and plans.
+              </p>
+            ) : (
+              turns.map((t) => <ChatMessage key={t.id} turn={t} onSave={saveAnswer} />)
+            )}
+            <div ref={endRef} />
+          </div>
 
-      <div className="flex shrink-0 items-center gap-2 border-t px-5 py-3" style={{ borderColor: "var(--glass-border)" }}>
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") ask(); }}
-          placeholder="Ask your brain anything…"
-          className="bg-transparent"
-          style={{ borderColor: "var(--glass-border)" }}
-        />
-        <button
-          type="button"
-          onClick={ask}
-          disabled={busy || !q.trim()}
-          aria-label="Send"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
-        >
-          <Send className="h-4 w-4" />
-        </button>
-      </div>
+          <div className="flex shrink-0 items-center gap-2 border-t px-5 py-3" style={{ borderColor: "var(--glass-border)" }}>
+            <Input
+              ref={inputRef}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") ask(); }}
+              placeholder="Ask your brain anything…"
+              className="bg-transparent"
+              style={{ borderColor: "var(--glass-border)" }}
+            />
+            <button
+              type="button"
+              onClick={ask}
+              disabled={busy || !q.trim()}
+              aria-label="Send"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -524,6 +524,27 @@ export type Database = {
           },
         ];
       };
+      brain_conversations: {
+        Row: {
+          id: string;
+          title: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          title?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          title?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       brain_chats: {
         Row: {
           id: string;
@@ -534,6 +555,7 @@ export type Database = {
           error_msg: string | null;
           created_at: string;
           updated_at: string;
+          conversation_id: string | null;
         };
         Insert: {
           id?: string;
@@ -544,6 +566,7 @@ export type Database = {
           error_msg?: string | null;
           created_at?: string;
           updated_at?: string;
+          conversation_id?: string | null;
         };
         Update: {
           id?: string;
@@ -554,8 +577,16 @@ export type Database = {
           error_msg?: string | null;
           created_at?: string;
           updated_at?: string;
+          conversation_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "brain_chats_conversation_id_fkey";
+            columns: ["conversation_id"];
+            referencedRelation: "brain_conversations";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       replan_requests: {
         Row: {
@@ -722,6 +753,7 @@ export type BrainLog = Database["public"]["Tables"]["brain_log"]["Row"];
 export type BrainReport = Database["public"]["Tables"]["brain_reports"]["Row"];
 export type BrainSnippet = Database["public"]["Tables"]["brain_snippets"]["Row"];
 export type BrainChat = Database["public"]["Tables"]["brain_chats"]["Row"];
+export type BrainConversation = Database["public"]["Tables"]["brain_conversations"]["Row"];
 export type ReplanRequest = Database["public"]["Tables"]["replan_requests"]["Row"];
 export type BrainSop = Database["public"]["Tables"]["brain_sops"]["Row"];
 export type ProjectNote = Database["public"]["Tables"]["project_notes"]["Row"];

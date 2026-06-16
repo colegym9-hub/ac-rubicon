@@ -9,6 +9,8 @@ import type {
   WikiDetail,
   SourceEntry,
   ChatTurn,
+  ConversationSummary,
+  ConversationDetail,
 } from "@/lib/brain/types";
 import type { BrainReport, ProjectNote } from "@/lib/database.types";
 
@@ -164,6 +166,50 @@ export async function getChat(id: string): Promise<ChatTurn | null> {
     ? (data.citations as { slug: string; title: string }[])
     : [];
   return { ...data, citations };
+}
+
+// ── Conversations (saved chat threads) ──────────────────────────────────────
+
+const toCitations = (raw: unknown): { slug: string; title: string }[] =>
+  Array.isArray(raw) ? (raw as { slug: string; title: string }[]) : [];
+
+/** Saved threads for the chat history panel, most recently active first. */
+export async function listConversations(limit = 50): Promise<ConversationSummary[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("brain_conversations")
+    .select("id, title, created_at, updated_at")
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/** A single thread with all its turns in order — used to reopen a conversation. */
+export async function getConversation(id: string): Promise<ConversationDetail | null> {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = createServiceClient();
+  const { data: convo, error } = await supabase
+    .from("brain_conversations")
+    .select("id, title, created_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!convo) return null;
+
+  const { data: rows, error: turnsError } = await supabase
+    .from("brain_chats")
+    .select("id, question, answer, status, citations, error_msg")
+    .eq("conversation_id", id)
+    .order("created_at", { ascending: true });
+  if (turnsError) throw new Error(turnsError.message);
+
+  const turns: ChatTurn[] = (rows ?? []).map((r) => ({
+    ...r,
+    citations: toCitations(r.citations),
+  }));
+  return { ...convo, turns };
 }
 
 // ── Project notes ───────────────────────────────────────────────────────────

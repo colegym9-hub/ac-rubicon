@@ -151,25 +151,21 @@ export default function RecapSheet({ log, blocks }: Props) {
   // ── Block completion helpers ─────────────────────────────────────────────────
 
   const setBlockPct = useCallback((id: string, pct: number) => {
-    setBlockCompletion(prev => {
-      const next: BlockCompletion = { ...prev, [id]: { pct, note: prev[id]?.note ?? "" } };
-      localStorage.setItem(LS_BLOCKS, JSON.stringify(next));
-      setSaved(false);
-      return next;
-    });
-  }, []);
+    const next: BlockCompletion = { ...blockCompletion, [id]: { pct, note: blockCompletion[id]?.note ?? "" } };
+    setBlockCompletion(next);
+    localStorage.setItem(LS_BLOCKS, JSON.stringify(next));
+    setSaved(false);
+  }, [blockCompletion]);
 
   // Note writes are debounced — localStorage only persists 300ms after the last keystroke.
   const setBlockNote = useCallback((id: string, note: string) => {
-    setBlockCompletion(prev => {
-      const next: BlockCompletion = { ...prev, [id]: { pct: prev[id]?.pct ?? 0, note } };
-      if (noteTimerRef.current) clearTimeout(noteTimerRef.current);
-      noteTimerRef.current = setTimeout(() => {
-        localStorage.setItem(LS_BLOCKS, JSON.stringify(next));
-      }, 300);
-      return next;
-    });
-  }, []);
+    const next: BlockCompletion = { ...blockCompletion, [id]: { pct: blockCompletion[id]?.pct ?? 0, note } };
+    setBlockCompletion(next);
+    if (noteTimerRef.current) clearTimeout(noteTimerRef.current);
+    noteTimerRef.current = setTimeout(() => {
+      localStorage.setItem(LS_BLOCKS, JSON.stringify(next));
+    }, 300);
+  }, [blockCompletion]);
 
   // ── Save ─────────────────────────────────────────────────────────────────────
 
@@ -178,8 +174,7 @@ export default function RecapSheet({ log, blocks }: Props) {
     fields.filter((f) => !f.db).forEach((f) => { extra[f.id] = get(f.id); });
     localStorage.setItem(LS_EXTRA, JSON.stringify(extra));
 
-    const workBlocks = blocks.filter(b => !["break", "buffer"].includes(b.kind));
-    const slotsDone  = workBlocks.length > 0
+    const slotsDone = workBlocks.length > 0
       ? workBlocks.filter(b => (blockCompletion[b.id]?.pct ?? 0) === 100).length
       : null;
 

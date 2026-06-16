@@ -60,3 +60,19 @@ export type ChatTurn = {
   citations: { slug: string; title: string }[];
   error_msg: string | null;
 };
+
+// A saved chat thread (many ChatTurns). Listed in the history panel and
+// reopened to continue with follow-up memory.
+export type ConversationSummary = {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ConversationDetail = {
+  id: string;
+  title: string | null;
+  created_at: string;
+  turns: ChatTurn[];
+};

@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo } from "react";
 import Link from "next/link";
 import type { ReactNode, ElementType } from "react";
 
@@ -48,7 +51,7 @@ function inline(text: string, kp: string): ReactNode[] {
 
 const isBlockStart = (l: string) => /^(#{1,6}\s|\s*[-*]\s|\s*\d+\.\s|>\s?|---+\s*$)/.test(l);
 
-export default function Markdown({ content }: { content: string }) {
+function parse(content: string): ReactNode[] {
   const lines = content.replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
   let i = 0;
@@ -110,5 +113,10 @@ export default function Markdown({ content }: { content: string }) {
     blocks.push(<p key={key++} className="my-2 text-sm leading-relaxed">{inline(para.join(" "), `p${key}`)}</p>);
   }
 
+  return blocks;
+}
+
+export default function Markdown({ content }: { content: string }) {
+  const blocks = useMemo(() => parse(content), [content]);
   return <div className="text-foreground">{blocks}</div>;
 }
