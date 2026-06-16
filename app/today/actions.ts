@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { writeDayPlan, writeRecap, writeReplanRequest } from "@/lib/data/mutations";
 import { getBlocksForDate } from "@/lib/data/today";
 import { fireRoutine } from "@/lib/brain/routine";
+import { saveWeeklyPlan } from "@/lib/data/sops";
 import type { DayBlock } from "@/lib/day";
 
 export type ActionResult = { error?: string };
@@ -43,6 +44,17 @@ export async function saveRecapForDate(
   const res = await writeRecap(input, date);
   if (!res.error) revalidatePath("/today");
   return res;
+}
+
+/** Save/update the weekly context brain-dump that the planner routine reads. */
+export async function updateWeeklyPlan(content: string): Promise<ActionResult> {
+  try {
+    await saveWeeklyPlan(content);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to save weekly plan." };
+  }
+  revalidatePath("/today");
+  return {};
 }
 
 /** Queue a two-question "re-plan from now" and wake the brain routine to rewrite

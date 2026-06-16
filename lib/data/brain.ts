@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type {
   CaptureSummary,
@@ -9,7 +10,7 @@ import type {
   SourceEntry,
   ChatTurn,
 } from "@/lib/brain/types";
-import type { BrainReport } from "@/lib/database.types";
+import type { BrainReport, ProjectNote } from "@/lib/database.types";
 
 const DOMAIN_ORDER = ["A.C Media", "BU", "Content", "Coursework", "Personal Ops", "Mindset"];
 
@@ -75,7 +76,7 @@ export async function getCaptureStatus(
 
 // ── Wiki ────────────────────────────────────────────────────────────────────
 
-export async function getWikiPages(): Promise<WikiGroup[]> {
+async function _getWikiPages(): Promise<WikiGroup[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -102,6 +103,8 @@ export async function getWikiPages(): Promise<WikiGroup[]> {
       ),
     }));
 }
+
+export const getWikiPages = unstable_cache(_getWikiPages, ["wiki-pages"], { revalidate: 600 });
 
 export async function getWikiPage(slug: string): Promise<WikiDetail | null> {
   if (!isSupabaseConfigured()) return null;
@@ -161,6 +164,22 @@ export async function getChat(id: string): Promise<ChatTurn | null> {
     ? (data.citations as { slug: string; title: string }[])
     : [];
   return { ...data, citations };
+}
+
+// ── Project notes ───────────────────────────────────────────────────────────
+
+export type ProjectNoteSummary = Pick<ProjectNote, "id" | "content_md" | "created_at">;
+
+export async function getProjectNotes(projectId: string): Promise<ProjectNoteSummary[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("project_notes")
+    .select("id, content_md, created_at")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data ?? [];
 }
 
 // ── Weekly reports (lint / insight — written by the Monday routine) ──────────

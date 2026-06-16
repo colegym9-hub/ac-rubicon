@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject } from "@/lib/data/project";
+import { getProjectNotes } from "@/lib/data/brain";
 import ProjectEditor from "@/components/projects/ProjectEditor";
 import ProgressControl from "@/components/projects/ProgressControl";
 import TaskRow from "@/components/projects/TaskRow";
 import AddTask from "@/components/projects/AddTask";
+import ProjectNotes from "@/components/projects/ProjectNotes";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +16,10 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { configured, detail } = await getProject(id);
+  const [{ configured, detail }, notes] = await Promise.all([
+    getProject(id),
+    getProjectNotes(id),
+  ]);
   if (configured && !detail) notFound();
 
   return (
@@ -70,6 +75,8 @@ export default async function ProjectDetailPage({
               <AddTask projectId={detail.project.id} />
             </div>
           </section>
+
+          <ProjectNotes projectId={detail.project.id} initialNotes={notes} />
         </>
       ) : null}
     </main>

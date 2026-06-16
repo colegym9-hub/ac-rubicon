@@ -154,3 +154,22 @@ export async function deleteTask(id: string): Promise<void> {
   if (error) throw new Error(error.message);
   refresh();
 }
+
+// ── Project notes ────────────────────────────────────────────────────────────
+
+export async function addProjectNote(
+  projectId: string,
+  content: string,
+): Promise<ActionResult> {
+  const text = content.trim();
+  if (!text) return { error: "Note cannot be empty." };
+
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("project_notes")
+    .insert({ project_id: projectId, content_md: text, source_id: null });
+  if (error) return { error: error.message };
+
+  refresh();
+  return {};
+}

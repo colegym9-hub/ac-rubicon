@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { getToday, getYesterdayLog } from "@/lib/data/today";
+import { getSop } from "@/lib/data/sops";
 import { partOfDay } from "@/lib/day";
 import CalendarView from "@/components/today/CalendarView";
 import RecapSheet from "@/components/today/RecapSheet";
+import WeeklyPlanCard from "@/components/today/WeeklyPlanCard";
 import MorningCheckIn from "@/components/today/MorningCheckIn";
 import ReplanSheet from "@/components/today/ReplanSheet";
 
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const [{ configured, date, blocks, log }, yesterday] = await Promise.all([
+  const [{ configured, date, blocks, log }, yesterday, weeklyPlan] = await Promise.all([
     getToday(),
     getYesterdayLog(),
+    getSop("weekly_plan"),
   ]);
   const pretty = new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
     weekday: "long",
@@ -58,7 +61,8 @@ export default async function TodayPage() {
           <CalendarView initialDate={date} initialBlocks={blocks} />
         </div>
         <div className="shrink-0 pb-20 md:pb-0 md:w-72 md:flex md:flex-col md:justify-end">
-          <RecapSheet log={log} />
+          <WeeklyPlanCard initial={weeklyPlan?.content_md ?? ""} />
+          <RecapSheet log={log} blocks={blocks} />
         </div>
       </div>
 
