@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useMemo } from "react";
 import { saveDayPlan } from "@/app/today/actions";
 import {
   BLOCK_KINDS,
@@ -45,7 +45,7 @@ export default function PlanEditor({ initial }: { initial: DayBlock[] }) {
     setLabel("");
   }
 
-  const doNext = pickDoNext(blocks);
+  const doNext = useMemo(() => pickDoNext(blocks), [blocks]);
   const fieldStyle = { borderColor: "var(--glass-border)" };
 
   return (

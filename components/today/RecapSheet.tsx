@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback, useTransition, useEffect } from "react";
+import { useState, useRef, useCallback, useTransition, useEffect, useMemo } from "react";
 import { saveRecap } from "@/app/today/actions";
 import type { DailyLog } from "@/lib/database.types";
+import type { DayBlock } from "@/lib/day";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { BookOpen, ChevronDown, SlidersHorizontal } from "lucide-react";
 
 // ─── Field config ─────────────────────────────────────────────────────────────
 
-type FieldType = "longtext" | "text" | "rating" | "number";
+type FieldType = "longtext" | "text" | "rating";
 
 interface LogField {
   id: string;
@@ -27,16 +28,18 @@ interface LogField {
 const ALL_FIELDS: LogField[] = [
   { id: "recap",     label: "Recap",         type: "longtext", enabled: true,  order: 0, db: true },
   { id: "energy",    label: "Energy",        type: "rating",   enabled: true,  order: 1, db: true },
-  { id: "blocks",    label: "Blocks done",   type: "number",   enabled: true,  order: 2, db: true },
-  { id: "slipped",   label: "What slipped?", type: "text",     enabled: true,  order: 3, db: true },
-  { id: "mood",      label: "Mood",          type: "rating",   enabled: false, order: 4, db: false },
-  { id: "wins",      label: "Wins",          type: "longtext", enabled: false, order: 5, db: false },
-  { id: "tomorrow",  label: "Tomorrow",      type: "text",     enabled: false, order: 6, db: false },
-  { id: "gratitude", label: "Gratitude",     type: "text",     enabled: false, order: 7, db: false },
+  { id: "slipped",   label: "What slipped?", type: "text",     enabled: true,  order: 2, db: true },
+  { id: "mood",      label: "Mood",          type: "rating",   enabled: false, order: 3, db: false },
+  { id: "wins",      label: "Wins",          type: "longtext", enabled: false, order: 4, db: false },
+  { id: "tomorrow",  label: "Tomorrow",      type: "text",     enabled: false, order: 5, db: false },
+  { id: "gratitude", label: "Gratitude",     type: "text",     enabled: false, order: 6, db: false },
 ];
 
 const LS_FIELDS = "rubicon:log-fields";
 const LS_EXTRA  = "rubicon:log-extra";
+const LS_BLOCKS = "rubicon:block-completion";
+
+type BlockCompletion = Record<string, { pct: number; note: string }>;
 
 function mergeWithSaved(base: LogField[]): LogField[] {
   try {
@@ -67,21 +70,24 @@ type SheetState = "closed" | "half" | "full";
 
 interface Props {
   log: DailyLog | null;
+  blocks: DayBlock[];
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function RecapSheet({ log }: Props) {
-  const [sheetState, setSheetState]   = useState<SheetState>("closed");
-  const [editingFields, setEditing]   = useState(false);
-  const [fields, setFields]           = useState<LogField[]>(ALL_FIELDS);
-  const [values, setValues]           = useState<Record<string, string>>({});
-  const [saved, setSaved]             = useState(false);
-  const [error, setError]             = useState<string | null>(null);
-  const [pending, start]              = useTransition();
+export default function RecapSheet({ log, blocks }: Props) {
+  const [sheetState, setSheetState]           = useState<SheetState>("closed");
+  const [editingFields, setEditing]           = useState(false);
+  const [fields, setFields]                   = useState<LogField[]>(ALL_FIELDS);
+  const [values, setValues]                   = useState<Record<string, string>>({});
+  const [blockCompletion, setBlockCompletion] = useState<BlockCompletion>({});
+  const [saved, setSaved]                     = useState(false);
+  const [error, setError]                     = useState<string | null>(null);
+  const [pending, start]                      = useTransition();
 
-  const dragStartY = useRef<number | null>(null);
-  const THRESHOLD  = 60;
+  const dragStartY    = useRef<number | null>(null);
+  const noteTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const THRESHOLD     = 60;
 
   // Load localStorage on mount (client-only)
   useEffect(() => {
@@ -93,12 +99,25 @@ export default function RecapSheet({ log }: Props) {
     })();
 
     setValues({
-      recap:    log?.recap_text    ?? "",
-      energy:   log?.energy    != null ? String(log.energy)    : "",
-      blocks:   log?.slots_done != null ? String(log.slots_done) : "",
-      slipped:  log?.slots_slipped ?? "",
+      recap:   log?.recap_text    ?? "",
+      energy:  log?.energy    != null ? String(log.energy)    : "",
+      slipped: log?.slots_slipped ?? "",
       ...extra,
     });
+
+    // Initialize block completion: seed from block.done, then overlay saved data
+    const fromBlocks: BlockCompletion = Object.fromEntries(
+      blocks.map(b => [b.id, { pct: b.done ? 100 : 0, note: "" }])
+    );
+    const savedCompletion: BlockCompletion = (() => {
+      try { return JSON.parse(localStorage.getItem(LS_BLOCKS) ?? "{}"); }
+      catch { return {}; }
+    })();
+    const merged: BlockCompletion = { ...fromBlocks };
+    for (const id of Object.keys(savedCompletion)) {
+      if (id in fromBlocks) merged[id] = savedCompletion[id];
+    }
+    setBlockCompletion(merged);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -129,19 +148,46 @@ export default function RecapSheet({ log }: Props) {
     setSaved(false);
   };
 
+  // ── Block completion helpers ─────────────────────────────────────────────────
+
+  const setBlockPct = useCallback((id: string, pct: number) => {
+    setBlockCompletion(prev => {
+      const next: BlockCompletion = { ...prev, [id]: { pct, note: prev[id]?.note ?? "" } };
+      localStorage.setItem(LS_BLOCKS, JSON.stringify(next));
+      setSaved(false);
+      return next;
+    });
+  }, []);
+
+  // Note writes are debounced — localStorage only persists 300ms after the last keystroke.
+  const setBlockNote = useCallback((id: string, note: string) => {
+    setBlockCompletion(prev => {
+      const next: BlockCompletion = { ...prev, [id]: { pct: prev[id]?.pct ?? 0, note } };
+      if (noteTimerRef.current) clearTimeout(noteTimerRef.current);
+      noteTimerRef.current = setTimeout(() => {
+        localStorage.setItem(LS_BLOCKS, JSON.stringify(next));
+      }, 300);
+      return next;
+    });
+  }, []);
+
   // ── Save ─────────────────────────────────────────────────────────────────────
 
   function handleSave() {
-    // Persist non-DB field values
     const extra: Record<string, string> = {};
     fields.filter((f) => !f.db).forEach((f) => { extra[f.id] = get(f.id); });
     localStorage.setItem(LS_EXTRA, JSON.stringify(extra));
+
+    const workBlocks = blocks.filter(b => !["break", "buffer"].includes(b.kind));
+    const slotsDone  = workBlocks.length > 0
+      ? workBlocks.filter(b => (blockCompletion[b.id]?.pct ?? 0) === 100).length
+      : null;
 
     start(async () => {
       const res = await saveRecap({
         recap:        get("recap") || undefined,
         energy:       get("energy") ? Number(get("energy")) : null,
-        slotsDone:    get("blocks") ? Number(get("blocks")) : null,
+        slotsDone,
         slotsSlipped: get("slipped") || undefined,
       });
       if (res?.error) { setError(res.error); return; }
@@ -175,11 +221,25 @@ export default function RecapSheet({ log }: Props) {
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
-  const isOpen       = sheetState !== "closed";
-  const enabledSorted = [...fields].sort((a, b) => a.order - b.order).filter((f) => f.enabled);
-  const hasLog       = !!log;
-  const summaryE     = log?.energy;
-  const summaryB     = log?.slots_done;
+  const isOpen        = sheetState !== "closed";
+  const enabledSorted = useMemo(
+    () => [...fields].sort((a, b) => a.order - b.order).filter((f) => f.enabled),
+    [fields],
+  );
+  const hasLog     = !!log;
+  const summaryE   = log?.energy;
+  const workBlocks = useMemo(
+    () => blocks.filter(b => !["break", "buffer"].includes(b.kind)),
+    [blocks],
+  );
+  const doneCount = useMemo(
+    () => workBlocks.filter(b => (blockCompletion[b.id]?.pct ?? 0) === 100).length,
+    [workBlocks, blockCompletion],
+  );
+  const partialCount = useMemo(
+    () => workBlocks.filter(b => { const p = blockCompletion[b.id]?.pct ?? 0; return p > 0 && p < 100; }).length,
+    [workBlocks, blockCompletion],
+  );
 
   const sheetHeight: Record<SheetState, string> = {
     closed: "55vh",
@@ -208,9 +268,16 @@ export default function RecapSheet({ log }: Props) {
               {summaryE != null && (
                 <span className="font-mono text-xs text-primary">E {summaryE}/5</span>
               )}
-              {summaryB != null && (
-                <span className="font-mono text-xs text-muted-foreground">{summaryB} blocks</span>
-              )}
+              {workBlocks.length > 0 ? (
+                <span className="font-mono text-xs text-muted-foreground">
+                  {doneCount}/{workBlocks.length}
+                  {partialCount > 0 && (
+                    <span className="ml-0.5 text-amber-400">+{partialCount}</span>
+                  )}
+                </span>
+              ) : log?.slots_done != null ? (
+                <span className="font-mono text-xs text-muted-foreground">{log.slots_done} blocks</span>
+              ) : null}
             </div>
           ) : (
             <span className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground/40">
@@ -274,6 +341,10 @@ export default function RecapSheet({ log }: Props) {
             pending={pending}
             saved={saved}
             error={error}
+            blocks={workBlocks}
+            blockCompletion={blockCompletion}
+            onBlockPct={setBlockPct}
+            onBlockNote={setBlockNote}
           />
         )}
       </div>
@@ -286,6 +357,7 @@ export default function RecapSheet({ log }: Props) {
 function LogForm({
   enabledFields, onGet, onSet, sheetState,
   onCollapse, onEditFields, onSave, pending, saved, error,
+  blocks, blockCompletion, onBlockPct, onBlockNote,
 }: {
   enabledFields: LogField[];
   onGet: (id: string) => string;
@@ -297,8 +369,50 @@ function LogForm({
   pending: boolean;
   saved: boolean;
   error: string | null;
+  blocks: DayBlock[];
+  blockCompletion: BlockCompletion;
+  onBlockPct: (id: string, pct: number) => void;
+  onBlockNote: (id: string, note: string) => void;
 }) {
   const isFull = sheetState === "full";
+
+  // Build ordered field list, injecting the blocks section just before "slipped"
+  const fieldItems: React.ReactNode[] = [];
+  let blocksInserted = false;
+  for (const field of enabledFields) {
+    if (!blocksInserted && field.id === "slipped" && blocks.length > 0) {
+      fieldItems.push(
+        <BlocksSection
+          key="__blocks"
+          blocks={blocks}
+          completion={blockCompletion}
+          onPct={onBlockPct}
+          onNote={onBlockNote}
+        />
+      );
+      blocksInserted = true;
+    }
+    fieldItems.push(
+      <FieldInput
+        key={field.id}
+        field={field}
+        value={onGet(field.id)}
+        onChange={(v) => onSet(field.id, v)}
+        compact={!isFull}
+      />
+    );
+  }
+  if (!blocksInserted && blocks.length > 0) {
+    fieldItems.push(
+      <BlocksSection
+        key="__blocks"
+        blocks={blocks}
+        completion={blockCompletion}
+        onPct={onBlockPct}
+        onNote={onBlockNote}
+      />
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -328,17 +442,9 @@ function LogForm({
         <h2 className="shrink-0 px-4 pb-3 text-base font-bold">How did today go?</h2>
       )}
 
-      {/* Fields */}
+      {/* Fields + blocks section */}
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-2">
-        {enabledFields.map((field) => (
-          <FieldInput
-            key={field.id}
-            field={field}
-            value={onGet(field.id)}
-            onChange={(v) => onSet(field.id, v)}
-            compact={!isFull}
-          />
-        ))}
+        {fieldItems}
       </div>
 
       {error && (
@@ -355,6 +461,86 @@ function LogForm({
         <Button onClick={onSave} disabled={pending} size="sm" className="w-full">
           {pending ? "Saving…" : "Save log"}
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Blocks section ───────────────────────────────────────────────────────────
+
+function BlocksSection({
+  blocks, completion, onPct, onNote,
+}: {
+  blocks: DayBlock[];
+  completion: BlockCompletion;
+  onPct: (id: string, pct: number) => void;
+  onNote: (id: string, note: string) => void;
+}) {
+  const glassB     = { borderColor: "var(--glass-border)" };
+  const labelClass = "font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground";
+
+  return (
+    <div>
+      <Label className={labelClass}>Blocks</Label>
+      <div className="mt-2 flex flex-col gap-4">
+        {blocks.map((block) => {
+          const pct       = completion[block.id]?.pct ?? 0;
+          const note      = completion[block.id]?.note ?? "";
+          const isPartial = pct > 0 && pct < 100;
+          const isDone    = pct === 100;
+
+          return (
+            <div key={block.id} className="flex flex-col gap-1.5">
+              {/* Label row */}
+              <div className="flex items-center gap-2">
+                <span className="w-[4.5rem] shrink-0 font-mono text-[0.6rem] text-muted-foreground/60">
+                  {block.start}–{block.end}
+                </span>
+                <span className="flex-1 truncate text-sm">{block.label}</span>
+                <span
+                  className={cn(
+                    "w-8 shrink-0 text-right font-mono text-[0.65rem] tabular-nums",
+                    isDone      ? "text-primary"
+                    : isPartial ? "text-amber-400"
+                    : "text-muted-foreground/40",
+                  )}
+                >
+                  {pct}%
+                </span>
+              </div>
+
+              {/* Completion slider */}
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={pct}
+                onChange={(e) => onPct(block.id, Number(e.target.value))}
+                className="w-full cursor-pointer"
+                style={{
+                  accentColor: isDone
+                    ? "var(--color-primary)"
+                    : isPartial
+                    ? "oklch(0.8 0.12 80)"
+                    : undefined,
+                }}
+              />
+
+              {/* Partial note — only visible when slider is between 1–99 */}
+              {isPartial && (
+                <Textarea
+                  value={note}
+                  onChange={(e) => onNote(block.id, e.target.value)}
+                  rows={2}
+                  placeholder="What got done?"
+                  className="resize-none bg-transparent text-xs"
+                  style={glassB}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -449,7 +635,7 @@ function FieldInput({
   onChange: (v: string) => void;
   compact: boolean;
 }) {
-  const glassB = { borderColor: "var(--glass-border)" };
+  const glassB     = { borderColor: "var(--glass-border)" };
   const labelClass = "font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground";
 
   if (field.type === "rating") {
@@ -473,22 +659,6 @@ function FieldInput({
             </button>
           ))}
         </div>
-      </div>
-    );
-  }
-
-  if (field.type === "number") {
-    return (
-      <div>
-        <Label className={labelClass}>{field.label}</Label>
-        <Input
-          type="number"
-          min={0}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="mt-1.5 bg-transparent"
-          style={glassB}
-        />
       </div>
     );
   }

@@ -68,7 +68,7 @@ export default function MorningCheckIn({ yesterday, yesterdayLog }: Props) {
   const labelCls = "font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm md:items-center md:pl-52">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 md:items-center md:pl-52">
       <div
         className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border bg-card p-5 pb-8 shadow-2xl md:rounded-2xl"
         style={{ borderColor: "var(--glass-border)" }}

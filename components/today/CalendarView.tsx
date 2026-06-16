@@ -66,24 +66,26 @@ function layoutBlocks(blocks: DayBlock[]): LayoutBlock[] {
   const sorted = sortBlocks(blocks);
   const out: LayoutBlock[] = sorted.map(b => ({ ...b, col: 0, cols: 1 }));
 
+  // Pre-compute minutes once — avoids repeated regex parsing in the O(n²) loop.
+  const mins = out.map(b => ({ s: toMinutes(b.start), e: toMinutes(b.end) }));
+
   // Step 1: greedy column assignment in time order
   const colEnds: number[] = [];
-  for (const b of out) {
-    const sMin = toMinutes(b.start);
+  for (let i = 0; i < out.length; i++) {
+    const sMin = mins[i].s;
     let col = colEnds.findIndex(end => end <= sMin);
     if (col === -1) { col = colEnds.length; colEnds.push(0); }
-    colEnds[col] = toMinutes(b.end);
-    b.col = col;
+    colEnds[col] = mins[i].e;
+    out[i].col = col;
   }
 
   // Step 2: for every block, cols = max column used by any block it overlaps + 1
   for (let i = 0; i < out.length; i++) {
-    const sMin = toMinutes(out[i].start);
-    const eMin = toMinutes(out[i].end);
+    const { s: sMin, e: eMin } = mins[i];
     let maxCol = out[i].col;
     for (let j = 0; j < out.length; j++) {
       if (j === i) continue;
-      if (toMinutes(out[j].start) < eMin && toMinutes(out[j].end) > sMin) {
+      if (mins[j].s < eMin && mins[j].e > sMin) {
         maxCol = Math.max(maxCol, out[j].col);
       }
     }
@@ -122,9 +124,11 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   const [nowMin, setNowMin]             = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
   const [isPending, startTrans]         = useTransition();
 
-  const today    = todayStr();
-  const weekSun  = weekSunday(selectedDate);
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekSun, i));
+  const today    = useMemo(() => todayStr(), []);
+  const weekDays = useMemo(() => {
+    const sun = weekSunday(selectedDate);
+    return Array.from({ length: 7 }, (_, i) => addDays(sun, i));
+  }, [selectedDate]);
 
   // Mutable refs to avoid stale closures in event listeners
   const pxRef         = useRef(pxPerHour);
@@ -350,8 +354,10 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   }
 
   // ── month picker ──────────────────────────────────────────────────────────────
-  const mcD    = new Date(`${monthCursor}T00:00:00`);
-  const mcLabel = `${MONTH_FULL[mcD.getMonth()]} ${mcD.getFullYear()}`;
+  const mcLabel = useMemo(() => {
+    const d = new Date(`${monthCursor}T00:00:00`);
+    return `${MONTH_FULL[d.getMonth()]} ${d.getFullYear()}`;
+  }, [monthCursor]);
 
   function shiftMonth(n: number) {
     const d = new Date(`${monthCursor}T00:00:00`);
@@ -359,20 +365,25 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
     setMonthCursor(monthStart(isoDate(d)));
   }
 
-  const mFirstDay = new Date(`${monthCursor}T00:00:00`).getDay();
-  const mDays     = daysInMonth(monthCursor);
-  const mCells: Array<string | null> = [
-    ...Array<null>(mFirstDay).fill(null),
-    ...Array.from({ length: mDays }, (_, i) =>
-      `${monthCursor.slice(0, 7)}-${String(i + 1).padStart(2, "0")}`,
-    ),
-  ];
-  while (mCells.length % 7 !== 0) mCells.push(null);
+  const mCells = useMemo((): Array<string | null> => {
+    const firstDay = new Date(`${monthCursor}T00:00:00`).getDay();
+    const nDays    = daysInMonth(monthCursor);
+    const cells: Array<string | null> = [
+      ...Array<null>(firstDay).fill(null),
+      ...Array.from({ length: nDays }, (_, i) =>
+        `${monthCursor.slice(0, 7)}-${String(i + 1).padStart(2, "0")}`,
+      ),
+    ];
+    while (cells.length % 7 !== 0) cells.push(null);
+    return cells;
+  }, [monthCursor]);
 
   // ── layout ────────────────────────────────────────────────────────────────────
   const laidOut  = useMemo(() => layoutBlocks(blocks), [blocks]);
-  const selD     = new Date(`${selectedDate}T00:00:00`);
-  const hdrLabel = `${MONTH_FULL[selD.getMonth()]} ${selD.getFullYear()}`;
+  const hdrLabel = useMemo(() => {
+    const d = new Date(`${selectedDate}T00:00:00`);
+    return `${MONTH_FULL[d.getMonth()]} ${d.getFullYear()}`;
+  }, [selectedDate]);
   const border   = { borderColor: "var(--glass-border)" };
 
   return (

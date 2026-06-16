@@ -9,5 +9,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const status = await getCaptureStatus(id);
   if (!status) return new NextResponse("Not found", { status: 404 });
-  return NextResponse.json(status);
+  const settled = status.status === "ingested" || status.status === "error";
+  return NextResponse.json(status, {
+    headers: {
+      "Cache-Control": settled ? "private, max-age=3600" : "no-store",
+    },
+  });
 }
