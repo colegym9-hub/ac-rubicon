@@ -1,12 +1,14 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import type { ChatTurn } from "@/lib/brain/types";
 import Markdown from "@/lib/brain/Markdown";
 import { Bookmark } from "lucide-react";
 
-export default function ChatMessage({ turn, onSave }: { turn: ChatTurn; onSave: (answer: string) => void }) {
-  const thinking = turn.status === "pending" || turn.status === "answering";
+function ChatMessage({ turn, onSave }: { turn: ChatTurn; onSave: (answer: string) => void }) {
+  const pending = turn.status === "pending";
+  const streaming = turn.status === "answering";
   return (
     <div className="flex flex-col gap-2">
       <p className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-sm text-primary-foreground">
@@ -16,14 +18,17 @@ export default function ChatMessage({ turn, onSave }: { turn: ChatTurn; onSave: 
         className="max-w-[90%] self-start rounded-2xl rounded-bl-sm border bg-card/60 px-3 py-2"
         style={{ borderColor: "var(--glass-border)" }}
       >
-        {thinking ? (
+        {pending ? (
           <p className="text-sm text-muted-foreground">Thinking…</p>
         ) : turn.status === "error" ? (
           <p className="text-sm text-destructive">{turn.error_msg || "Something went wrong."}</p>
         ) : (
           <>
             <Markdown content={turn.answer || ""} />
-            {turn.citations.length > 0 && (
+            {streaming && (
+              <span className="inline-block h-3 w-0.5 animate-pulse bg-muted-foreground align-middle" />
+            )}
+            {!streaming && turn.citations.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {turn.citations.map((c) => (
                   <Link
@@ -36,7 +41,7 @@ export default function ChatMessage({ turn, onSave }: { turn: ChatTurn; onSave: 
                 ))}
               </div>
             )}
-            {turn.answer && (
+            {!streaming && turn.answer && (
               <button
                 type="button"
                 onClick={() => onSave(turn.answer!)}
@@ -51,3 +56,5 @@ export default function ChatMessage({ turn, onSave }: { turn: ChatTurn; onSave: 
     </div>
   );
 }
+
+export default memo(ChatMessage);

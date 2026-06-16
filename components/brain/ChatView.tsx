@@ -10,56 +10,74 @@ export default function ChatView({ onClose }: { onClose: () => void }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const stop = useCallback(() => {
-    if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = null;
+  const abort = useCallback(() => {
+    readerRef.current?.cancel();
+    readerRef.current = null;
   }, []);
-  useEffect(() => () => stop(), [stop]);
+  useEffect(() => () => abort(), [abort]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [turns]);
-
-  function poll(id: string) {
-    let tries = 0;
-    pollRef.current = setInterval(async () => {
-      tries++;
-      try {
-        const res = await fetch(`/api/brain/chat/${id}`);
-        if (res.ok) {
-          const chat: ChatTurn = await res.json();
-          setTurns((t) => t.map((x) => (x.id === id ? chat : x)));
-          if (chat.status === "answered" || chat.status === "error") { stop(); setBusy(false); }
-        }
-      } catch { /* keep polling */ }
-      if (tries > 40) { stop(); setBusy(false); } // ~2 min cap (routine wakes post-deploy)
-    }, 3000);
-  }
 
   async function ask() {
     const question = q.trim();
     if (!question || busy) return;
     setQ("");
     setBusy(true);
-    const tempId = `temp-${turns.length}`;
-    setTurns((t) => [...t, { id: tempId, question, answer: null, status: "pending", citations: [], error_msg: null }]);
+    const tempId = `temp-${Date.now()}`;
+    setTurns((t) => [...t, { id: tempId, question, answer: "", status: "pending", citations: [], error_msg: null }]);
     try {
       const res = await fetch("/api/brain/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question }),
       });
-      if (!res.ok) throw new Error(await res.text());
-      const { id } = await res.json();
-      setTurns((t) => t.map((x) => (x.id === tempId ? { ...x, id } : x)));
-      poll(id);
+      if (!res.ok) {
+        const msg = await res.text();
+        setTurns((t) => t.map((x) => (x.id === tempId ? { ...x, status: "error", error_msg: msg || "Couldn't send." } : x)));
+        setBusy(false);
+        return;
+      }
+
+      const chatId = res.headers.get("X-Chat-Id") ?? tempId;
+      // Promote the temp turn to the real DB id and switch to streaming state
+      setTurns((t) => t.map((x) => (x.id === tempId ? { ...x, id: chatId, status: "answering" } : x)));
+
+      if (!res.body) throw new Error("No response body");
+      const reader = res.body.getReader();
+      readerRef.current = reader;
+      const decoder = new TextDecoder();
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        setTurns((t) =>
+          t.map((x) =>
+            x.id === chatId ? { ...x, answer: (x.answer ?? "") + chunk, status: "answering" } : x
+          )
+        );
+      }
+
+      // Stream closed — mark answered
+      setTurns((t) => t.map((x) => (x.id === chatId ? { ...x, status: "answered" } : x)));
     } catch {
-      setTurns((t) => t.map((x) => (x.id === tempId ? { ...x, status: "error", error_msg: "Couldn't send." } : x)));
+      setTurns((t) =>
+        t.map((x) =>
+          x.id === tempId || x.status === "answering"
+            ? { ...x, status: "error", error_msg: "Couldn't send." }
+            : x
+        )
+      );
+    } finally {
+      readerRef.current = null;
       setBusy(false);
     }
   }
 
-  async function saveAnswer(answer: string) {
+  const saveAnswer = useCallback(async (answer: string) => {
     try {
       await fetch("/api/brain/save-answer", {
         method: "POST",
@@ -67,7 +85,7 @@ export default function ChatView({ onClose }: { onClose: () => void }) {
         body: JSON.stringify({ answer }),
       });
     } catch { /* best-effort */ }
-  }
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background md:left-52">
