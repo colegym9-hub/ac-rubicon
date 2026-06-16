@@ -17,11 +17,20 @@ export async function POST(req: Request) {
   if (!question) return new NextResponse("Empty question", { status: 400 });
   const incomingConversationId = body?.conversationId ? String(body.conversationId) : null;
 
+  // Guard a client-supplied thread id before it reaches Postgres — a malformed
+  // value would otherwise surface as a raw 500 from the uuid cast.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (incomingConversationId && !UUID_RE.test(incomingConversationId)) {
+    return new NextResponse("Invalid conversationId", { status: 400 });
+  }
+
   const supabase = createServiceClient();
 
   // Resolve the thread this turn belongs to — create one on the first message.
-  let conversationId = incomingConversationId;
-  if (!conversationId) {
+  let conversationId: string;
+  if (incomingConversationId) {
+    conversationId = incomingConversationId;
+  } else {
     const title = question.length > 80 ? `${question.slice(0, 79)}…` : question;
     const { data: convo, error: convoError } = await supabase
       .from("brain_conversations")
@@ -77,11 +86,30 @@ export async function POST(req: Request) {
     "You are a personal knowledge assistant. Answer concisely and accurately using only the provided wiki context. If the context doesn't cover the question, say so.";
 
   // Prior turns first (memory), then the current question with fresh wiki context.
+  // Retrieval runs only for the current question — prior turns carry their text,
+  // not their original wiki context — so follow-up context doesn't balloon.
   const messages: Anthropic.MessageParam[] = [];
   for (const t of priorTurns) {
     messages.push({ role: "user", content: t.question });
     messages.push({ role: "assistant", content: t.answer! });
   }
+
+  // Cache the conversation-history prefix so follow-up turns don't reprocess the
+  // whole thread at full price. Prior turns are rebuilt verbatim from the DB each
+  // request, so `system + history` is byte-identical on every follow-up and earns
+  // a cache read. The breakpoint sits on the last prior turn; the volatile wiki
+  // context + question stay after it, so they never invalidate the cached prefix.
+  const lastPrior = messages[messages.length - 1];
+  if (lastPrior) {
+    lastPrior.content = [
+      {
+        type: "text",
+        text: lastPrior.content as string,
+        cache_control: { type: "ephemeral" },
+      },
+    ];
+  }
+
   messages.push({
     role: "user",
     content: [

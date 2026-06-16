@@ -123,7 +123,7 @@ export default function ChatView({ onClose }: { onClose: () => void }) {
           <button type="button" onClick={newChat} disabled={busy} aria-label="New chat" className="text-muted-foreground hover:text-foreground disabled:opacity-40">
             <SquarePen className="h-5 w-5" />
           </button>
-          <button type="button" onClick={() => setShowHistory((v) => !v)} aria-label="History" className="text-muted-foreground hover:text-foreground">
+          <button type="button" onClick={() => setShowHistory((v) => !v)} disabled={busy} aria-label="History" className="text-muted-foreground hover:text-foreground disabled:opacity-40">
             <History className="h-5 w-5" />
           </button>
           <button type="button" onClick={onClose} aria-label="Close" className="text-muted-foreground hover:text-foreground">
