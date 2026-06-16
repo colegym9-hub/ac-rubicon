@@ -4,16 +4,22 @@ import { useState, useTransition } from "react";
 import { replanFromNow } from "@/app/today/actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Wand2, X } from "lucide-react";
+import { Wand2 } from "lucide-react";
 
-const TIME_OPTIONS = ["1h", "2h", "3h", "4h+"];
+function hoursLeftToday(): string {
+  const now = new Date();
+  const rem = Math.max(0, 23 * 60 - (now.getHours() * 60 + now.getMinutes()));
+  const h = Math.floor(rem / 60);
+  const m = rem % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
 
-/** "Re-plan from now": two quick questions → queues a request the brain routine
- *  acts on to rewrite the rest of today. Self-contained trigger + modal. */
+/** "Re-plan from now": one question → queues a request the brain routine acts on. */
 export default function ReplanSheet() {
   const [open, setOpen] = useState(false);
   const [whatChanged, setWhatChanged] = useState("");
-  const [timeLeft, setTimeLeft] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -22,7 +28,6 @@ export default function ReplanSheet() {
     setOpen(false);
     setDone(false);
     setWhatChanged("");
-    setTimeLeft(null);
     setError(null);
   }
 
@@ -30,12 +35,14 @@ export default function ReplanSheet() {
     start(async () => {
       const res = await replanFromNow({
         whatChanged: whatChanged || undefined,
-        timeLeft: timeLeft || undefined,
+        timeLeft: hoursLeftToday(),
       });
       if (res?.error) { setError(res.error); return; }
       setDone(true);
     });
   }
+
+  const border = { borderColor: "var(--glass-border)" };
 
   return (
     <>
@@ -43,21 +50,19 @@ export default function ReplanSheet() {
         type="button"
         onClick={() => setOpen(true)}
         className="flex items-center gap-1 rounded-[3px] border px-2 py-1 font-mono text-[0.55rem] uppercase tracking-[0.15em] text-primary transition-colors hover:bg-primary/10"
-        style={{ borderColor: "var(--glass-border)" }}
+        style={border}
       >
         <Wand2 className="h-3 w-3" /> Re-plan
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm md:items-center md:pl-52" onClick={close}>
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/60" onClick={close} />
           <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md rounded-t-2xl border bg-card p-5 pb-8 shadow-2xl md:rounded-2xl"
-            style={{ borderColor: "var(--glass-border)" }}
+            className="fixed inset-x-0 bottom-0 z-[70] rounded-t-2xl border-t bg-card px-5 pt-4 pb-10 shadow-2xl"
+            style={border}
           >
-            <button type="button" onClick={close} aria-label="Close" className="absolute right-4 top-4 text-muted-foreground transition-colors hover:text-foreground">
-              <X className="h-5 w-5" />
-            </button>
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
 
             {done ? (
               <div className="flex flex-col gap-3">
@@ -70,37 +75,20 @@ export default function ReplanSheet() {
               <div className="flex flex-col gap-4">
                 <div>
                   <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">Re-plan from now</span>
-                  <h2 className="mt-1 text-xl font-extrabold leading-tight">Two quick things.</h2>
-                </div>
-
-                <div>
-                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground">What changed?</span>
-                  <Textarea
-                    value={whatChanged}
-                    onChange={(e) => setWhatChanged(e.target.value)}
-                    rows={2}
-                    placeholder="e.g. skipping the gym, a call came up at 4"
-                    className="mt-1.5 resize-none bg-transparent"
-                    style={{ borderColor: "var(--glass-border)" }}
-                  />
-                </div>
-
-                <div>
-                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground">Time left today?</span>
-                  <div className="mt-1.5 flex gap-2">
-                    {TIME_OPTIONS.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setTimeLeft(timeLeft === t ? null : t)}
-                        className={["flex-1 rounded-[var(--radius)] border py-2 text-sm font-medium transition-colors",
-                          timeLeft === t ? "border-primary bg-primary text-primary-foreground" : "border-muted/50 text-muted-foreground hover:border-border hover:text-foreground"].join(" ")}
-                      >
-                        {t}
-                      </button>
-                    ))}
+                  <div className="mt-0.5 flex items-baseline justify-between">
+                    <h2 className="text-xl font-extrabold leading-tight">What changed?</h2>
+                    <span className="font-mono text-[0.6rem] text-muted-foreground/60">~{hoursLeftToday()} left</span>
                   </div>
                 </div>
+
+                <Textarea
+                  value={whatChanged}
+                  onChange={(e) => setWhatChanged(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. skipping gym, a call came up at 4"
+                  className="resize-none bg-transparent"
+                  style={border}
+                />
 
                 {error && <p className="text-xs text-destructive">{error}</p>}
 
@@ -110,7 +98,7 @@ export default function ReplanSheet() {
               </div>
             )}
           </div>
-        </div>
+        </>
       )}
     </>
   );
