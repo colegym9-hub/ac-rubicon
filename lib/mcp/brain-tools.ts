@@ -245,4 +245,100 @@ export function registerBrainTools(server: McpServer) {
       return error ? fail(error.message) : ok();
     },
   );
+
+  server.tool(
+    "save_chat_answer",
+    "Save the routine's answer to a brain_chat question. Sets status='answered' and clears any error.",
+    {
+      chatId: z.string(),
+      answer: z.string(),
+      citations: z.array(z.string()).optional(),
+    },
+    async ({ chatId, answer, citations }) => {
+      const sb = createServiceClient();
+      const { error } = await sb.from("brain_chats").update({
+        answer,
+        status: "answered",
+        citations: citations ?? [],
+        error_msg: null,
+      }).eq("id", chatId);
+      return error ? fail(error.message) : ok();
+    },
+  );
+
+  server.tool(
+    "mark_replan_done",
+    "Mark a replan_request as completed after the routine has produced and saved the new plan.",
+    { replanId: z.string() },
+    async ({ replanId }) => {
+      const sb = createServiceClient();
+      const { error } = await sb.from("replan_requests").update({ status: "done" }).eq("id", replanId);
+      return error ? fail(error.message) : ok();
+    },
+  );
+
+  server.tool(
+    "save_lint_report",
+    "Persist a weekly lint report — a list of wiki pages that have issues. kind='lint', status='done' (ready to display).",
+    {
+      weekOf: z.string(),
+      issues: z.array(z.object({ slug: z.string(), title: z.string(), issue: z.string() })),
+      summary: z.string().optional(),
+    },
+    async ({ weekOf, issues, summary }) => {
+      const sb = createServiceClient();
+      const { error } = await sb.from("brain_reports").insert({
+        kind: "lint",
+        week_of: weekOf,
+        issues,
+        summary: summary ?? null,
+        status: "done",
+      });
+      return error ? fail(error.message) : ok();
+    },
+  );
+
+  server.tool(
+    "save_insight",
+    "Persist a weekly insight report. kind='insight', status='done' (ready to display). The insight string maps to the summary column.",
+    {
+      weekOf: z.string(),
+      insight: z.string(),
+    },
+    async ({ weekOf, insight }) => {
+      const sb = createServiceClient();
+      const { error } = await sb.from("brain_reports").insert({
+        kind: "insight",
+        week_of: weekOf,
+        summary: insight,
+        status: "done",
+      });
+      return error ? fail(error.message) : ok();
+    },
+  );
+
+  server.tool(
+    "get_weekly_plan",
+    "Read the weekly plan from brain_sops (key='weekly_plan'). Returns { content: string } — empty string if not yet set.",
+    {},
+    async () => {
+      const sb = createServiceClient();
+      const { data } = await sb.from("brain_sops").select("content_md").eq("key", "weekly_plan").maybeSingle();
+      return json({ content: data?.content_md ?? "" });
+    },
+  );
+
+  server.tool(
+    "save_weekly_plan",
+    "Upsert the weekly plan into brain_sops (key='weekly_plan'). Creates the row if absent, overwrites if present.",
+    { content: z.string() },
+    async ({ content }) => {
+      const sb = createServiceClient();
+      const { error } = await sb.from("brain_sops").upsert(
+        { key: "weekly_plan", label: "Weekly Plan", content_md: content, sort: 99 },
+        { onConflict: "key" },
+      );
+      return error ? fail(error.message) : ok();
+    },
+  );
 }
