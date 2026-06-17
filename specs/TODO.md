@@ -28,6 +28,14 @@ The log's optional fields were floating in one global browser-localStorage blob 
 - [x] Shared `addDaysISO` + `isLogged` in `lib/day.ts` (`isLogged` stops a forward-note-only row from counting as "logged" in the morning check-in). RecapSheet reads/writes the dated row instead of localStorage; "Tomorrow" on by default with a hint; Today shows a "Note for today" card.
 - [x] Verified end-to-end against the live DB via the preview: write-forward → `daily_logs[tomorrow].plan_note`, read-back re-seeds the field, clear writes null. Today's real recap untouched; no console errors.
 
+## Calendar cloud-sync fix — timezone + live refresh (2026-06-17) ✅
+
+Phone edits weren't showing on desktop. `CalendarView` rolled its own **UTC** date helpers (`toISOString`), so evening edits (ET past ~8pm = already next-day UTC) were filed under *tomorrow's* `daily_plans` row while the server reads "today" in `America/New_York`. Same filing cabinet (Supabase), wrong drawer — the server-side `APP_TZ` fix (line 142) had never reached the client component.
+
+- [x] `CalendarView` now uses the shared app-timezone helpers from `lib/day.ts` (`todayISO`/`addDaysISO`/`nowHHMM`) — deleted the local UTC `isoDate`/`todayStr`; `weekSunday` is noon-UTC-anchored; `shiftMonth` does pure `YYYY-MM` string math; now-line + mount-scroll use `nowHHMM`. Client and server now agree on "today."
+- [x] **Live update** across devices without realtime infra: `refreshSelected` re-pulls the selected day via the existing `fetchBlocksForDate` server action on window `focus` + tab-visible, plus a quiet 20s poll (visible tabs only). Guarded by `savingRef` / `gestureRef` / `sheet.open` + a `selectedDateRef` post-fetch re-check so it never clobbers an in-flight save, drag, or open editor. Browser still holds no Supabase client — same service-role-behind-the-gate model.
+- [x] Verified via preview: `/today` renders the correct ET date, no console errors; dispatched `focus` → `POST /today 200` (the refetch); hidden-tab poll correctly no-ops. `tsc --noEmit` + `next lint` clean.
+
 ## Brain — saved conversations (in progress 2026-06-16)
 
 Threads for "Ask your brain": each chat turn now belongs to a `brain_conversations` row, so the panel can list/reopen past threads and the model gets prior-turn memory on follow-ups.

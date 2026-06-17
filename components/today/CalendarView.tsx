@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useTransition, useMemo, useCallback } from "react";
 import { saveDayPlan, fetchBlocksForDate } from "@/app/today/actions";
-import { type DayBlock, sortBlocks, toMinutes } from "@/lib/day";
+import { type DayBlock, sortBlocks, toMinutes, todayISO, addDaysISO, nowHHMM } from "@/lib/day";
 import BlockChip from "./BlockChip";
 import AddBlockSheet from "./AddBlockSheet";
 
@@ -18,19 +18,17 @@ const DAY_ABBR   = ["Su", "M", "Tu", "W", "Th", "F", "Sa"];
 const MONTH_FULL = ["January","February","March","April","May","June",
                     "July","August","September","October","November","December"];
 
-function isoDate(d: Date)  { return d.toISOString().slice(0, 10); }
-function todayStr()        { return isoDate(new Date()); }
-
+// Date math delegates to the app-timezone-aware helpers in @/lib/day so the
+// calendar agrees with the server on what "today" is. The browser's UTC date
+// (toISOString) was filing evening edits under tomorrow's row — see specs/TODO.md.
 function addDays(iso: string, n: number) {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() + n);
-  return isoDate(d);
+  return addDaysISO(iso, n);
 }
 
 function weekSunday(iso: string) {
-  const d = new Date(`${iso}T00:00:00`);
-  d.setDate(d.getDate() - d.getDay());
-  return isoDate(d);
+  // getUTCDay() at noon-UTC = this calendar date's weekday, free of tz rollover.
+  const dow = new Date(`${iso}T12:00:00Z`).getUTCDay();
+  return addDaysISO(iso, -dow);
 }
 
 function monthStart(iso: string) { return `${iso.slice(0, 7)}-01`; }
@@ -121,10 +119,10 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   const [monthCursor, setMonthCursor]   = useState(monthStart(initialDate));
   const [dragVisual, setDragVisual]     = useState<{ id: string; startMin: number; endMin: number } | null>(null);
   const [sheet, setSheet]               = useState<{ open: boolean; time?: string; edit?: DayBlock }>({ open: false });
-  const [nowMin, setNowMin]             = useState(() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); });
+  const [nowMin, setNowMin]             = useState(() => toMinutes(nowHHMM()));
   const [isPending, startTrans]         = useTransition();
 
-  const today    = useMemo(() => todayStr(), []);
+  const today    = useMemo(() => todayISO(), []);
   const weekDays = useMemo(() => {
     const sun = weekSunday(selectedDate);
     return Array.from({ length: 7 }, (_, i) => addDays(sun, i));
@@ -137,12 +135,15 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   const gridRef       = useRef<HTMLDivElement>(null);
   const pinchRef      = useRef<{ dist: number; topMin: number; startPx: number } | null>(null);
   const gestureRef    = useRef<Gesture | null>(null);
+  const savingRef     = useRef(false);              // true while a save is in flight
+  const selectedDateRef = useRef(selectedDate);     // latest selected day (async guard)
   const cleanupRef    = useRef<(() => void) | null>(null);
   const headerTouchX  = useRef<number | null>(null);
   const gridTapStart  = useRef<{ y: number; t: number } | null>(null);
 
   useEffect(() => { pxRef.current = pxPerHour; },      [pxPerHour]);
   useEffect(() => { dragVisualRef.current = dragVisual; }, [dragVisual]);
+  useEffect(() => { selectedDateRef.current = selectedDate; }, [selectedDate]);
 
   // Re-sync from the server when it sends fresh blocks for the initial date —
   // e.g. "Re-plan from now" saves a new plan then calls router.refresh(). `blocks`
@@ -156,20 +157,16 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   // Cleanup window listeners on unmount (in case a drag is in progress)
   useEffect(() => () => { cleanupRef.current?.(); }, []);
 
-  // Tick nowMin every minute
+  // Tick nowMin every minute (app-timezone wall clock)
   useEffect(() => {
-    const id = setInterval(() => {
-      const d = new Date();
-      setNowMin(d.getHours() * 60 + d.getMinutes());
-    }, 60_000);
+    const id = setInterval(() => setNowMin(toMinutes(nowHHMM())), 60_000);
     return () => clearInterval(id);
   }, []);
 
   // Scroll to ~2h before now on mount
   useEffect(() => {
     if (!scrollRef.current) return;
-    const d = new Date();
-    scrollRef.current.scrollTop = Math.max(0, ((d.getHours() * 60 + d.getMinutes() - 120) / 60) * DEF_PX);
+    scrollRef.current.scrollTop = Math.max(0, ((toMinutes(nowHHMM()) - 120) / 60) * DEF_PX);
   }, []);
 
   // Non-passive pinch zoom
@@ -214,7 +211,11 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   function persist(next: DayBlock[], date = selectedDate) {
     const sorted = sortBlocks(next);
     setBlocks(sorted);
-    startTrans(async () => { await saveDayPlan(sorted, date); });
+    savingRef.current = true;
+    startTrans(async () => {
+      try { await saveDayPlan(sorted, date); }
+      finally { savingRef.current = false; }
+    });
   }
 
   // ── date navigation ──────────────────────────────────────────────────────────
@@ -237,6 +238,41 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
       });
     }
   }, [selectedDate, initialDate, initialBlocks, showMonth]);
+
+  // ── live update ───────────────────────────────────────────────────────────────
+  // Re-pull the selected day from the cloud so edits made on another device show
+  // up here: on focus / tab-visible, plus a quiet poll while the tab is open.
+  // (The browser never holds a Supabase client — this goes through the same
+  //  service-role server action as the initial load, behind the password gate.)
+  const refreshSelected = useCallback(() => {
+    // Never clobber an in-flight save, an active drag/resize, or an open editor.
+    if (savingRef.current || gestureRef.current || sheet.open) return;
+    const date = selectedDate;
+    void (async () => {
+      try {
+        const { blocks: fetched } = await fetchBlocksForDate(date);
+        // Re-check after the round-trip: the user may have started editing or
+        // navigated to another day while we were fetching.
+        if (savingRef.current || gestureRef.current) return;
+        if (selectedDateRef.current !== date) return;
+        setBlocks(sortBlocks(fetched));
+      } catch {
+        /* transient focus/network race — keep showing what we have */
+      }
+    })();
+  }, [selectedDate, sheet.open]);
+
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") refreshSelected(); };
+    window.addEventListener("focus", refreshSelected);
+    document.addEventListener("visibilitychange", onVisible);
+    const id = setInterval(onVisible, 20_000);
+    return () => {
+      window.removeEventListener("focus", refreshSelected);
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(id);
+    };
+  }, [refreshSelected]);
 
   // ── block gestures ────────────────────────────────────────────────────────────
   function onBlockPointerDown(e: React.PointerEvent<HTMLDivElement>, block: DayBlock) {
@@ -369,9 +405,10 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   }, [monthCursor]);
 
   function shiftMonth(n: number) {
-    const d = new Date(`${monthCursor}T00:00:00`);
-    d.setMonth(d.getMonth() + n);
-    setMonthCursor(monthStart(isoDate(d)));
+    // Pure year/month arithmetic on the YYYY-MM-01 cursor — no Date(), no tz drift.
+    const [y, m] = monthCursor.split("-").map(Number);
+    const idx = y * 12 + (m - 1) + n;
+    setMonthCursor(`${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, "0")}-01`);
   }
 
   const mCells = useMemo((): Array<string | null> => {
