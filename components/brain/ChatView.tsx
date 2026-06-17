@@ -116,8 +116,8 @@ export default function ChatView({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background md:left-52">
-      <header className="flex shrink-0 items-center justify-between border-b px-5 py-4" style={{ borderColor: "var(--glass-border)" }}>
+    <div className="fixed inset-0 z-[60] flex flex-col bg-background md:left-52">
+      <header className="flex shrink-0 items-center justify-between border-b px-5 pb-4" style={{ borderColor: "var(--glass-border)", paddingTop: "calc(1rem + env(safe-area-inset-top, 0px))" }}>
         <h2 className="text-base font-bold">Ask your brain</h2>
         <div className="flex items-center gap-3">
           <button type="button" onClick={newChat} disabled={busy} aria-label="New chat" className="text-muted-foreground hover:text-foreground disabled:opacity-40">
@@ -147,7 +147,7 @@ export default function ChatView({ onClose }: { onClose: () => void }) {
             <div ref={endRef} />
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 border-t px-5 py-3" style={{ borderColor: "var(--glass-border)" }}>
+          <div className="flex shrink-0 items-center gap-2 border-t px-5 pt-3" style={{ borderColor: "var(--glass-border)", paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" }}>
             <Input
               ref={inputRef}
               value={q}
