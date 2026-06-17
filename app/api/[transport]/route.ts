@@ -20,4 +20,21 @@ const handler = createMcpHandler(
 // password-cookie gate (see middleware.ts) so a headless routine can reach it.
 const authedHandler = withMcpAuth(handler, verifyMcpToken, { required: true });
 
-export { authedHandler as GET, authedHandler as POST, authedHandler as DELETE };
+function optionsHandler() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "https://claude.ai",
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Authorization, Content-Type, mcp-session-id",
+      "Access-Control-Max-Age": "86400",
+    },
+  });
+}
+
+export {
+  authedHandler as GET,
+  authedHandler as POST,
+  authedHandler as DELETE,
+  optionsHandler as OPTIONS,
+};
