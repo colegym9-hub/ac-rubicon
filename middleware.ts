@@ -9,6 +9,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // OAuth metadata and flow endpoints must be reachable without a session cookie.
+  if (pathname.startsWith("/.well-known/")) {
+    return NextResponse.next();
+  }
+
   // The MCP endpoints do their own bearer-token auth (lib/mcp/auth.ts) and a
   // headless routine never carries the session cookie — let them past the gate.
   // Exact-path checks (not a loose prefix) so /api/mcp-anything stays gated.
