@@ -87,7 +87,7 @@ const FILE_TOOL: Anthropic.Tool = {
   },
 };
 
-type PendingSource = {
+type IngestSource = {
   id: string;
   type: string;
   title: string | null;
@@ -148,7 +148,7 @@ async function loadRunContext(): Promise<RunContext> {
 
 /** Ingest a single source. Always leaves it in a terminal state
  *  (ingested | needs_review | error) so the drain loop never re-fetches it. */
-async function ingestOne(source: PendingSource, ctx: RunContext): Promise<string> {
+async function ingestOne(source: IngestSource, ctx: RunContext): Promise<string> {
   const sb = createServiceClient();
 
   // 1. Ensure markdown content (convert links; notes already have it). Only
@@ -327,7 +327,7 @@ export async function runIngest(): Promise<{ processed: number; results: string[
       .not("tags", "cs", "{migrated}")
       .order("created_at", { ascending: true })
       .limit(1);
-    const source = data?.[0] as PendingSource | undefined;
+    const source = data?.[0] as IngestSource | undefined;
     if (!source) break;
 
     try {
@@ -340,6 +340,114 @@ export async function runIngest(): Promise<{ processed: number; results: string[
   }
 
   return { processed: results.length, results };
+}
+
+/** Manually file a needs_review/error source to a user-chosen wiki page.
+ *  Runs the same AI filing step as ingestOne but with the target page forced as
+ *  the sole candidate and an explicit instruction to file (not park). */
+export async function fileSourceToPage(
+  sourceId: string,
+  targetSlug: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const sb = createServiceClient();
+
+  const { data: raw } = await sb
+    .from("raw_sources")
+    .select("id, type, title, raw_input, content_md, status")
+    .eq("id", sourceId)
+    .maybeSingle();
+
+  if (!raw) return { ok: false, error: "Source not found" };
+  if (!["needs_review", "error"].includes(raw.status as string)) {
+    return { ok: false, error: "Source is not in a reviewable state" };
+  }
+
+  const source = raw as IngestSource;
+  const contentMd = source.content_md;
+  if (!contentMd?.trim()) return { ok: false, error: "Source has no content to file" };
+
+  const { data: page } = await sb
+    .from("wiki_pages")
+    .select("slug, title, domain, overview, content_md, related_slugs")
+    .eq("slug", targetSlug)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (!page) return { ok: false, error: "Wiki page not found" };
+
+  const ctx = await loadRunContext();
+
+  let msg: Anthropic.Message;
+  try {
+    msg = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 4096,
+      system: [
+        {
+          type: "text",
+          text:
+            ctx.systemText +
+            "\n\nIMPORTANT: The user has manually routed this source to the shown page. You MUST use action='file'. Do not choose needs_review.",
+          cache_control: { type: "ephemeral" },
+        },
+        {
+          type: "text",
+          text:
+            `Wiki index (all active pages):\n${JSON.stringify(ctx.index)}\n\n` +
+            `Active projects:\n${JSON.stringify(ctx.projects)}`,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      tools: [FILE_TOOL],
+      tool_choice: { type: "tool", name: "file_source" },
+      messages: [
+        {
+          role: "user",
+          content:
+            `Target page (user-chosen — file to this page):\n${JSON.stringify([page])}\n\n` +
+            `Source to file:\nType: ${source.type}\nTitle: ${source.title ?? "(untitled)"}\n` +
+            `Content:\n${contentMd.slice(0, SOURCE_CHARS_CAP)}`,
+        },
+      ],
+    });
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : "AI request failed";
+    await setSourceStatus(sourceId, "error", errMsg);
+    return { ok: false, error: errMsg };
+  }
+
+  const toolUse = msg.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+  if (!toolUse) return { ok: false, error: "No decision from AI" };
+
+  const decision = toolUse.input as FileDecision;
+
+  if (decision.action !== "file" || !decision.pages?.length) {
+    await setSourceStatus(sourceId, "needs_review", decision.reviewReason ?? "AI declined manual routing");
+    return { ok: false, error: decision.reviewReason ?? "AI declined to file" };
+  }
+
+  const target = decision.pages.find((p) => p.slug === targetSlug) ?? decision.pages[0];
+
+  const u = await upsertWikiPage({
+    slug: target.slug,
+    title: target.title,
+    domain: WIKI_DOMAINS.includes(target.domain) ? target.domain : "Personal Ops",
+    overview: target.overview,
+    content_md: target.content_md,
+    relatedSlugs: target.relatedSlugs,
+  });
+  if (u.error) return { ok: false, error: `Wiki write failed: ${u.error}` };
+
+  await linkSourceToPage({ sourceId, pageSlug: target.slug, contribution: "added" });
+  await setSourceStatus(sourceId, "ingested");
+  await appendBrainLog({
+    operation: "ingest",
+    summary: decision.logSummary ?? `Manually filed "${source.title ?? sourceId}" → ${target.slug}`,
+    targetType: "raw_source",
+    targetId: sourceId,
+  });
+
+  return { ok: true };
 }
 
 /** Run the drain only if no other run is in flight. Atomic claim: only the caller

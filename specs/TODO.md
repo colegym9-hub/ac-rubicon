@@ -38,6 +38,18 @@ Threads for "Ask your brain": each chat turn now belongs to a `brain_conversatio
 
 ---
 
+## WHOOP in-app data (Path B) — planned, not started (decided 2026-06-17)
+
+**Decision:** pull WHOOP health data **into the app** (DB + UI), not just read it at plan-time. Use WHOOP's **OAuth 2.0 REST API** directly — the same API the WHOOP MCP wraps. (MCP stays for the planning *agent*; the app does server-to-server sync via the REST API.)
+
+- [ ] **NEEDS ME:** register a WHOOP developer app → provide `WHOOP_CLIENT_ID` / `WHOOP_CLIENT_SECRET` (env vars, never in code).
+- [ ] OAuth connect flow — one-time authorize to capture the access + refresh token; persist server-only in Supabase; refresh on expiry.
+- [ ] Sync job → Supabase — new `whoop_*` table(s) for recovery / sleep / cycle (strain) / workouts. Cron route or `POST /api/whoop/sync`. Mirror the WHOOP API shapes (recovery score %, sleep, strain).
+- [ ] Today UI — real WHOOP recovery chip (today `MorningCheckIn` is only *WHOOP-styled*, no real data). Unblocks the deferred M4 mood-vs-WHOOP overlay on `/insights` (line 130) and the recovery-chip stub (M2 line 122).
+- _Lighter precursor (Path A, already stubbed):_ the daily routine can read WHOOP via its **MCP at plan-time** with none of the above — see `routines/daily.md:35`, `routines/plan-my-day.md:85`. Do this first; Path B is the bigger, in-app build.
+
+---
+
 ## Brain Expansion (B0–B5) — ✅ COMPLETE
 
 ### B0 — Foundation ✅
