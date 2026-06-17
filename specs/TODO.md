@@ -56,6 +56,21 @@ Threads for "Ask your brain": each chat turn now belongs to a `brain_conversatio
 
 ---
 
+## Linear-inspired ideas — candidate backlog (2026-06-17)
+
+From the deep study in `research/linear-study.md` (lens: steal Linear's best ideas for ac-rubicon). These are **proposals, not committed work** — Cole picks what's worth building. Already-shipped Linear patterns that validate the direction: OKLCH design tokens (M0), the ⌘K command palette (M1), the drag-and-drop priority board (M1). Below is what's genuinely *additive*.
+
+- [ ] **NEEDS ME (product call): "Week as a cycle" with auto-rollover.** The flagship idea. Treat the week as an auto-repeating cycle where unfinished tasks **auto-carry** to the next day/week instead of being re-copied or stranded (Linear: "no way to keep unfinished issues in a closed cycle"). Builds on the existing weekly plan + `scheduled_for`. Decide: roll over daily, weekly, or both; automatic vs. a one-tap "roll forward."
+- [ ] **Triage inbox for tasks** — a review gate between capture/Notion/GCal and "Today," with 4 actions: Accept (schedule) / Decline (drop) / Merge (fold into a task) / Snooze (resurface on a date). Brain `captures` already model an inbox for *knowledge*; this is the same idea for *tasks*, to keep the active list clean.
+- [ ] **Snooze / "push to tomorrow" as a one-gesture verb** + swipe actions on the Today list (swipe-right = complete, swipe-left = snooze/reschedule). Today has inline check-off + drag; add defer-as-a-first-class-action (Linear's mobile centerpiece).
+- [ ] **Capacity warning from rolling velocity** — flag when a day/week is over-committed vs the last ~3 weeks' completed `effort`. Reuses the existing task `effort` field; no new data needed.
+- [ ] **NEEDS ME (product call): Goal/Initiative layer above Projects.** A top tier (Health, Grow channel, Ship ac-rubicon…) grouping Notion projects so every task ladders up to a visible "why," with a 3-state health (on track / at risk / off track) rolled up at weekly recap. Decide whether goals live in Notion or in-app.
+- [ ] **"Shipped this week" recap** — auto-generate the list of completed tasks at weekly recap (the personal analog of Linear's changelog). High motivational ROI; reuses `completed_at`.
+- [ ] **Enabler vs blocker tag at weekly setup** — a two-bucket prompt (removes friction vs adds value) to bias the week toward needle-movers. Cheap add to `WeeklyPlanCard`.
+- [ ] **Perceived-performance pass** — audit Today/Projects for optimistic UI + no-spinner + instant-boot-from-cache (React `useOptimistic`, skeletons over spinners, restore last view from `localStorage`). Linear's cheapest "feels premium" wins; confirm what ac-rubicon already does and close gaps.
+
+---
+
 ## WHOOP in-app data (Path B) — planned, not started (decided 2026-06-17)
 
 **Decision:** pull WHOOP health data **into the app** (DB + UI), not just read it at plan-time. Use WHOOP's **OAuth 2.0 REST API** directly — the same API the WHOOP MCP wraps. (MCP stays for the planning *agent*; the app does server-to-server sync via the REST API.)
