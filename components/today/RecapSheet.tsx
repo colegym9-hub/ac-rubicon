@@ -183,9 +183,13 @@ export default function RecapSheet({ log, blocks, tomorrowNote }: Props) {
       ? workBlocks.filter(b => (blockCompletion[b.id]?.pct ?? 0) === 100).length
       : null;
 
-    // Only touch tomorrow's note when the field is on, so a user who never enables
-    // it never writes (or clears) tomorrow's plan_note.
-    const tomorrowOn = fields.some((f) => f.id === "tomorrow" && f.enabled);
+    // Only touch tomorrow's note when the field is on AND its value actually
+    // changed from what's already stored — so a user who never enables it (or
+    // just saves without touching it) never writes/clears tomorrow's plan_note
+    // or litters an empty next-day row on every save.
+    const tomorrowChanged =
+      fields.some((f) => f.id === "tomorrow" && f.enabled) &&
+      get("tomorrow") !== (tomorrowNote ?? "");
 
     start(async () => {
       const res = await saveRecap({
@@ -194,7 +198,7 @@ export default function RecapSheet({ log, blocks, tomorrowNote }: Props) {
         slotsDone,
         slotsSlipped: get("slipped") || undefined,
         extra,
-        ...(tomorrowOn ? { tomorrowNote: get("tomorrow") } : {}),
+        ...(tomorrowChanged ? { tomorrowNote: get("tomorrow") } : {}),
       });
       if (res?.error) { setError(res.error); return; }
       setError(null);

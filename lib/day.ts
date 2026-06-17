@@ -110,16 +110,19 @@ export function partOfDay(when: Date = new Date()): "Morning" | "Afternoon" | "E
   return "Evening";
 }
 
-/** A daily_logs row only counts as "logged" if it carries real recap content.
- *  A row that exists solely to hold a forward `plan_note` (written the night
- *  before via the "Tomorrow" field) is NOT a log — otherwise the morning
- *  check-in would think the day was already recapped. */
+/** A daily_logs row counts as "logged" if it carries any content the log form
+ *  writes — recap/energy/slots OR the `extra` blob (a real save always writes
+ *  `extra`, even a block-completion-only one). A row that exists SOLELY to hold a
+ *  forward `plan_note` (written the night before via the "Tomorrow" field) has
+ *  none of these, so it is NOT a log — otherwise the morning check-in would think
+ *  the day was already recapped. */
 export function isLogged(log: DailyLog | null | undefined): boolean {
   return (
     !!log &&
     (log.recap_text != null ||
       log.energy != null ||
       log.slots_done != null ||
-      log.slots_slipped != null)
+      log.slots_slipped != null ||
+      log.extra != null)
   );
 }
