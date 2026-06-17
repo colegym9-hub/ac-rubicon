@@ -2,6 +2,8 @@
 // daily_plans.blocks is a jsonb array of DayBlock (this is the contract the
 // future AI scheduler writes and the Today view reads — tunable, flagged in TODO).
 
+import type { DailyLog } from "@/lib/database.types";
+
 export type BlockKind =
   | "deep"
   | "light"
@@ -65,6 +67,15 @@ export function todayISO(): string {
   return localDateISO();
 }
 
+/** Add `delta` days to an ISO date (YYYY-MM-DD) via a noon-UTC anchor (DST-safe).
+ *  Shared by the planner (yesterday/adherence window) and the Today log's
+ *  "Tomorrow" → tomorrow's-row write-forward. */
+export function addDaysISO(isoDate: string, delta: number): string {
+  const d = new Date(`${isoDate}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Current wall-clock "HH:MM" (24h) in the app timezone. */
 export function nowHHMM(): string {
   return HHMM_FMT.format(new Date());
@@ -97,4 +108,18 @@ export function partOfDay(when: Date = new Date()): "Morning" | "Afternoon" | "E
   if (h < 12) return "Morning";
   if (h < 18) return "Afternoon";
   return "Evening";
+}
+
+/** A daily_logs row only counts as "logged" if it carries real recap content.
+ *  A row that exists solely to hold a forward `plan_note` (written the night
+ *  before via the "Tomorrow" field) is NOT a log — otherwise the morning
+ *  check-in would think the day was already recapped. */
+export function isLogged(log: DailyLog | null | undefined): boolean {
+  return (
+    !!log &&
+    (log.recap_text != null ||
+      log.energy != null ||
+      log.slots_done != null ||
+      log.slots_slipped != null)
+  );
 }

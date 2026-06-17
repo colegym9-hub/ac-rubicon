@@ -61,7 +61,7 @@ export function registerTools(server: McpServer) {
   );
   server.tool(
     "get_today",
-    "Today's plan blocks, evening recap log, and tasks scheduled for today.",
+    "Today's plan blocks, evening recap log (incl. the day's plan_note — the intention Cole left for today the night before — and extra log fields), tomorrowNote (the note already set for tomorrow), and tasks scheduled for today.",
     {},
     async () => json(await getToday()),
   );
@@ -79,7 +79,7 @@ export function registerTools(server: McpServer) {
   );
   server.tool(
     "get_planning_context",
-    "ONE-CALL bundle for day planning: today's date, last night's recap, today's existing plan, tasks already scheduled for today, top unblocked tasks by weight, active projects, tracked metrics, and recent plan adherence. Start here when generating a day plan.",
+    "ONE-CALL bundle for day planning: today's date, planNote (the note/intention Cole left for today via last night's 'Tomorrow' field — weight this heavily), last night's recap, today's existing plan, tasks already scheduled for today, top unblocked tasks by weight, active projects, tracked metrics, and recent plan adherence. Start here when generating a day plan.",
     {},
     async () => json(await getPlanningContext()),
   );
@@ -139,12 +139,13 @@ export function registerTools(server: McpServer) {
   );
   server.tool(
     "save_recap",
-    "Write today's evening recap: free text, energy 1–5, slots done/slipped.",
+    "Write today's evening recap: free text, energy 1–5, slots done/slipped. Optionally set tomorrowNote — a note/intention written onto tomorrow's day (its plan_note), which the next morning's planner reads via get_planning_context. Pass tomorrowNote: \"\" to clear it.",
     {
       recap: z.string().optional(),
       energy: z.number().int().min(1).max(5).nullable().optional(),
       slotsDone: z.number().int().min(0).nullable().optional(),
       slotsSlipped: z.string().optional(),
+      tomorrowNote: z.string().optional(),
     },
     async (input) => done(await writeRecap(input)),
   );

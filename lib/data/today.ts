@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { DailyLog, DailyPlan, TaskWithWeight } from "@/lib/database.types";
-import { type DayBlock, sortBlocks, todayISO } from "@/lib/day";
+import { addDaysISO, type DayBlock, sortBlocks, todayISO } from "@/lib/day";
 
 export type Today = {
   configured: boolean;
@@ -9,6 +9,9 @@ export type Today = {
   plan: DailyPlan | null;
   blocks: DayBlock[];
   log: DailyLog | null;
+  /** Tomorrow's `plan_note`, if any — seeds the log's "Tomorrow" field so editing
+   *  it is idempotent (re-opening shows what was already written for tomorrow). */
+  tomorrowNote: string | null;
   scheduledTasks: TaskWithWeight[];
 };
 
@@ -31,6 +34,7 @@ export async function getBlocksForDate(date: string): Promise<DayBlock[]> {
 
 export async function getToday(): Promise<Today> {
   const date = todayISO();
+  const tomorrow = addDaysISO(date, 1);
   if (!isSupabaseConfigured()) {
     return {
       configured: false,
@@ -38,14 +42,16 @@ export async function getToday(): Promise<Today> {
       plan: null,
       blocks: [],
       log: null,
+      tomorrowNote: null,
       scheduledTasks: [],
     };
   }
 
   const supabase = createServiceClient();
-  const [planRes, logRes, tasksRes] = await Promise.all([
+  const [planRes, logRes, tomorrowRes, tasksRes] = await Promise.all([
     supabase.from("daily_plans").select("*").eq("date", date).maybeSingle(),
     supabase.from("daily_logs").select("*").eq("date", date).maybeSingle(),
+    supabase.from("daily_logs").select("plan_note").eq("date", tomorrow).maybeSingle(),
     supabase
       .from("task_weights")
       .select("*")
@@ -56,6 +62,7 @@ export async function getToday(): Promise<Today> {
 
   if (planRes.error) throw new Error(planRes.error.message);
   if (logRes.error) throw new Error(logRes.error.message);
+  if (tomorrowRes.error) throw new Error(tomorrowRes.error.message);
   if (tasksRes.error) throw new Error(tasksRes.error.message);
 
   return {
@@ -64,6 +71,7 @@ export async function getToday(): Promise<Today> {
     plan: planRes.data ?? null,
     blocks: parseBlocks(planRes.data?.blocks),
     log: logRes.data ?? null,
+    tomorrowNote: tomorrowRes.data?.plan_note ?? null,
     scheduledTasks: tasksRes.data ?? [],
   };
 }
@@ -71,9 +79,7 @@ export async function getToday(): Promise<Today> {
 /** Yesterday's log + its date — drives the morning check-in (fill it out if
  *  null, review it if present). */
 export async function getYesterdayLog(): Promise<{ date: string; log: DailyLog | null }> {
-  const d = new Date(`${todayISO()}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - 1);
-  const date = d.toISOString().slice(0, 10);
+  const date = addDaysISO(todayISO(), -1);
   if (!isSupabaseConfigured()) return { date, log: null };
 
   const supabase = createServiceClient();

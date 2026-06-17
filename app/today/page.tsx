@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Sunrise } from "lucide-react";
 import { getToday, getYesterdayLog } from "@/lib/data/today";
 import { getSop } from "@/lib/data/sops";
 import { partOfDay } from "@/lib/day";
@@ -11,7 +12,7 @@ import ReplanSheet from "@/components/today/ReplanSheet";
 export const dynamic = "force-dynamic";
 
 export default async function TodayPage() {
-  const [{ configured, date, blocks, log }, yesterday, weeklyPlan] = await Promise.all([
+  const [{ configured, date, blocks, log, tomorrowNote }, yesterday, weeklyPlan] = await Promise.all([
     getToday(),
     getYesterdayLog(),
     getSop("weekly_plan"),
@@ -61,8 +62,22 @@ export default async function TodayPage() {
           <CalendarView initialDate={date} initialBlocks={blocks} />
         </div>
         <div className="shrink-0 pb-20 md:pb-0 md:w-72 md:flex md:flex-col md:justify-end">
+          {log?.plan_note && (
+            <div
+              className="mx-2 mb-2 shrink-0 rounded-[var(--radius)] border bg-card/70 px-4 py-3 backdrop-blur-md"
+              style={{ borderColor: "var(--glass-border)" }}
+            >
+              <div className="mb-1 flex items-center gap-1.5">
+                <Sunrise className="h-3.5 w-3.5 text-primary" />
+                <span className="font-mono text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground">
+                  Note for today
+                </span>
+              </div>
+              <p className="whitespace-pre-wrap text-sm text-foreground">{log.plan_note}</p>
+            </div>
+          )}
           <WeeklyPlanCard initial={weeklyPlan?.content_md ?? ""} />
-          <RecapSheet log={log} blocks={blocks} />
+          <RecapSheet log={log} blocks={blocks} tomorrowNote={tomorrowNote} />
         </div>
       </div>
 

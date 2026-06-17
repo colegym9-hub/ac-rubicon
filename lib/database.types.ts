@@ -205,6 +205,8 @@ export type Database = {
           slots_slipped: string | null;
           energy: number | null;
           parsed: unknown | null;
+          plan_note: string | null;
+          extra: unknown | null;
           created_at: string;
           updated_at: string;
         };
@@ -216,6 +218,8 @@ export type Database = {
           slots_slipped?: string | null;
           energy?: number | null;
           parsed?: unknown | null;
+          plan_note?: string | null;
+          extra?: unknown | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -227,6 +231,8 @@ export type Database = {
           slots_slipped?: string | null;
           energy?: number | null;
           parsed?: unknown | null;
+          plan_note?: string | null;
+          extra?: unknown | null;
           created_at?: string;
           updated_at?: string;
         };

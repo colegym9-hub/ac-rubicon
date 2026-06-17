@@ -24,6 +24,8 @@ export async function saveRecap(input: {
   energy?: number | null;
   slotsDone?: number | null;
   slotsSlipped?: string;
+  extra?: Record<string, unknown> | null;
+  tomorrowNote?: string | null;
 }): Promise<ActionResult> {
   const res = await writeRecap(input);
   if (!res.error) revalidatePath("/today");

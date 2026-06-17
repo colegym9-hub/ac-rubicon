@@ -1,7 +1,7 @@
 import "server-only";
 import { createServiceClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { DailyLog, TaskWithWeight } from "@/lib/database.types";
-import { type DayBlock, sortBlocks, todayISO } from "@/lib/day";
+import { addDaysISO, type DayBlock, sortBlocks, todayISO } from "@/lib/day";
 
 const TOP_TASK_LIMIT = 20;
 const ADHERENCE_DAYS = 7;
@@ -22,6 +22,7 @@ export type PlanningContext = {
   alreadyPlanned: boolean;
   todayPlanSource: "auto" | "edited" | null; // "edited" = Cole hand-tuned it; don't clobber
   todayBlocks: DayBlock[];
+  planNote: string | null; // note Cole left for today (written last night via the log's "Tomorrow" field)
   lastRecap: DailyLog | null; // yesterday's recap/log — "tomorrow responds"
   scheduledToday: TaskWithWeight[];
   topTasks: TaskWithWeight[]; // top unblocked todo/doing tasks by weight
@@ -29,13 +30,6 @@ export type PlanningContext = {
   activeMetrics: ContextMetric[];
   recentAdherence: AdherenceDay[]; // last 7 days planned vs done
 };
-
-/** Add `delta` days to an ISO date via a noon-UTC anchor (DST-safe). */
-function isoPlusDays(isoDate: string, delta: number): string {
-  const d = new Date(`${isoDate}T12:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + delta);
-  return d.toISOString().slice(0, 10);
-}
 
 function parseBlocks(value: unknown): DayBlock[] {
   return Array.isArray(value) ? (value as DayBlock[]) : [];
@@ -46,8 +40,8 @@ function parseBlocks(value: unknown): DayBlock[] {
  *  together. The planning *logic* lives in the routine prompt; this is the data. */
 export async function getPlanningContext(): Promise<PlanningContext> {
   const date = todayISO();
-  const yesterday = isoPlusDays(date, -1);
-  const adherenceCutoff = isoPlusDays(date, -(ADHERENCE_DAYS - 1));
+  const yesterday = addDaysISO(date, -1);
+  const adherenceCutoff = addDaysISO(date, -(ADHERENCE_DAYS - 1));
 
   const empty: PlanningContext = {
     configured: false,
@@ -56,6 +50,7 @@ export async function getPlanningContext(): Promise<PlanningContext> {
     alreadyPlanned: false,
     todayPlanSource: null,
     todayBlocks: [],
+    planNote: null,
     lastRecap: null,
     scheduledToday: [],
     topTasks: [],
@@ -66,9 +61,10 @@ export async function getPlanningContext(): Promise<PlanningContext> {
   if (!isSupabaseConfigured()) return empty;
 
   const supabase = createServiceClient();
-  const [planRes, recapRes, topRes, schedRes, projectsRes, metricsRes, adherenceRes] =
+  const [planRes, todayLogRes, recapRes, topRes, schedRes, projectsRes, metricsRes, adherenceRes] =
     await Promise.all([
       supabase.from("daily_plans").select("blocks, source").eq("date", date).maybeSingle(),
+      supabase.from("daily_logs").select("plan_note").eq("date", date).maybeSingle(),
       supabase.from("daily_logs").select("*").eq("date", yesterday).maybeSingle(),
       supabase
         .from("task_weights")
@@ -97,6 +93,7 @@ export async function getPlanningContext(): Promise<PlanningContext> {
     ]);
 
   if (planRes.error) throw new Error(planRes.error.message);
+  if (todayLogRes.error) throw new Error(todayLogRes.error.message);
   if (recapRes.error) throw new Error(recapRes.error.message);
   if (topRes.error) throw new Error(topRes.error.message);
   if (schedRes.error) throw new Error(schedRes.error.message);
@@ -122,6 +119,7 @@ export async function getPlanningContext(): Promise<PlanningContext> {
     alreadyPlanned: Boolean(planRes.data),
     todayPlanSource: planRes.data?.source ?? null,
     todayBlocks: sortBlocks(parseBlocks(planRes.data?.blocks)),
+    planNote: todayLogRes.data?.plan_note ?? null,
     lastRecap: recapRes.data ?? null,
     scheduledToday: schedRes.data ?? [],
     topTasks: topRes.data ?? [],

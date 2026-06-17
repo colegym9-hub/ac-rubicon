@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useTransition, useEffect, useMemo } from "react";
 import { saveRecap } from "@/app/today/actions";
 import type { DailyLog } from "@/lib/database.types";
-import type { DayBlock } from "@/lib/day";
+import { isLogged, type DayBlock } from "@/lib/day";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,15 +31,23 @@ const ALL_FIELDS: LogField[] = [
   { id: "slipped",   label: "What slipped?", type: "text",     enabled: true,  order: 2, db: true },
   { id: "mood",      label: "Mood",          type: "rating",   enabled: false, order: 3, db: false },
   { id: "wins",      label: "Wins",          type: "longtext", enabled: false, order: 4, db: false },
-  { id: "tomorrow",  label: "Tomorrow",      type: "text",     enabled: false, order: 5, db: false },
+  { id: "tomorrow",  label: "Tomorrow",      type: "text",     enabled: true,  order: 5, db: false },
   { id: "gratitude", label: "Gratitude",     type: "text",     enabled: false, order: 6, db: false },
 ];
 
+// Only the field layout (which fields are on + their order) is a device-local
+// preference; the field *values* now live on the dated daily_logs row.
 const LS_FIELDS = "rubicon:log-fields";
-const LS_EXTRA  = "rubicon:log-extra";
-const LS_BLOCKS = "rubicon:block-completion";
 
 type BlockCompletion = Record<string, { pct: number; note: string }>;
+
+/** The day's optional log content, persisted in daily_logs.extra (jsonb) so it is
+ *  tied to the date + readable by the MCP — replaces the old localStorage blobs.
+ *  The "tomorrow" field is NOT here; it write-forwards to tomorrow's plan_note. */
+type LogExtra = {
+  fields?: Record<string, string>; // mood / wins / gratitude / custom (non-core, non-tomorrow)
+  blocks?: BlockCompletion;        // per-block { pct, note } keyed by block id
+};
 
 function mergeWithSaved(base: LogField[]): LogField[] {
   try {
@@ -71,11 +79,13 @@ type SheetState = "closed" | "half" | "full";
 interface Props {
   log: DailyLog | null;
   blocks: DayBlock[];
+  /** Tomorrow's existing plan_note — seeds the "Tomorrow" field so it's idempotent. */
+  tomorrowNote: string | null;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function RecapSheet({ log, blocks }: Props) {
+export default function RecapSheet({ log, blocks, tomorrowNote }: Props) {
   const [sheetState, setSheetState]           = useState<SheetState>("closed");
   const [editingFields, setEditing]           = useState(false);
   const [fields, setFields]                   = useState<LogField[]>(ALL_FIELDS);
@@ -86,33 +96,28 @@ export default function RecapSheet({ log, blocks }: Props) {
   const [pending, start]                      = useTransition();
 
   const dragStartY    = useRef<number | null>(null);
-  const noteTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const THRESHOLD     = 60;
 
-  // Load localStorage on mount (client-only)
+  // Seed the form on mount from the dated row (daily_logs.extra) + tomorrow's note.
   useEffect(() => {
     setFields(mergeWithSaved(ALL_FIELDS));
 
-    const extra: Record<string, string> = (() => {
-      try { return JSON.parse(localStorage.getItem(LS_EXTRA) ?? "{}"); }
-      catch { return {}; }
-    })();
+    const stored: LogExtra =
+      log?.extra && typeof log.extra === "object" ? (log.extra as LogExtra) : {};
 
     setValues({
-      recap:   log?.recap_text    ?? "",
-      energy:  log?.energy    != null ? String(log.energy)    : "",
-      slipped: log?.slots_slipped ?? "",
-      ...extra,
+      recap:    log?.recap_text    ?? "",
+      energy:   log?.energy    != null ? String(log.energy) : "",
+      slipped:  log?.slots_slipped ?? "",
+      ...(stored.fields ?? {}),
+      tomorrow: tomorrowNote ?? "",
     });
 
-    // Initialize block completion: seed from block.done, then overlay saved data
+    // Block completion: seed from block.done, then overlay the saved per-block data.
     const fromBlocks: BlockCompletion = Object.fromEntries(
       blocks.map(b => [b.id, { pct: b.done ? 100 : 0, note: "" }])
     );
-    const savedCompletion: BlockCompletion = (() => {
-      try { return JSON.parse(localStorage.getItem(LS_BLOCKS) ?? "{}"); }
-      catch { return {}; }
-    })();
+    const savedCompletion = stored.blocks ?? {};
     const merged: BlockCompletion = { ...fromBlocks };
     for (const id of Object.keys(savedCompletion)) {
       if (id in fromBlocks) merged[id] = savedCompletion[id];
@@ -150,33 +155,37 @@ export default function RecapSheet({ log, blocks }: Props) {
 
   // ── Block completion helpers ─────────────────────────────────────────────────
 
+  // Block completion lives in component state and is persisted (to daily_logs.extra)
+  // together with the rest of the log on Save — no per-keystroke writes.
   const setBlockPct = useCallback((id: string, pct: number) => {
-    const next: BlockCompletion = { ...blockCompletion, [id]: { pct, note: blockCompletion[id]?.note ?? "" } };
-    setBlockCompletion(next);
-    localStorage.setItem(LS_BLOCKS, JSON.stringify(next));
+    setBlockCompletion(prev => ({ ...prev, [id]: { pct, note: prev[id]?.note ?? "" } }));
     setSaved(false);
-  }, [blockCompletion]);
+  }, []);
 
-  // Note writes are debounced — localStorage only persists 300ms after the last keystroke.
   const setBlockNote = useCallback((id: string, note: string) => {
-    const next: BlockCompletion = { ...blockCompletion, [id]: { pct: blockCompletion[id]?.pct ?? 0, note } };
-    setBlockCompletion(next);
-    if (noteTimerRef.current) clearTimeout(noteTimerRef.current);
-    noteTimerRef.current = setTimeout(() => {
-      localStorage.setItem(LS_BLOCKS, JSON.stringify(next));
-    }, 300);
-  }, [blockCompletion]);
+    setBlockCompletion(prev => ({ ...prev, [id]: { pct: prev[id]?.pct ?? 0, note } }));
+    setSaved(false);
+  }, []);
 
   // ── Save ─────────────────────────────────────────────────────────────────────
 
   function handleSave() {
-    const extra: Record<string, string> = {};
-    fields.filter((f) => !f.db).forEach((f) => { extra[f.id] = get(f.id); });
-    localStorage.setItem(LS_EXTRA, JSON.stringify(extra));
+    // Non-core field values → extra.fields, EXCEPT the special "tomorrow" field,
+    // which write-forwards to tomorrow's plan_note.
+    const extraFields: Record<string, string> = {};
+    fields
+      .filter((f) => !f.db && f.id !== "tomorrow")
+      .forEach((f) => { const v = get(f.id); if (v) extraFields[f.id] = v; });
+
+    const extra: LogExtra = { fields: extraFields, blocks: blockCompletion };
 
     const slotsDone = workBlocks.length > 0
       ? workBlocks.filter(b => (blockCompletion[b.id]?.pct ?? 0) === 100).length
       : null;
+
+    // Only touch tomorrow's note when the field is on, so a user who never enables
+    // it never writes (or clears) tomorrow's plan_note.
+    const tomorrowOn = fields.some((f) => f.id === "tomorrow" && f.enabled);
 
     start(async () => {
       const res = await saveRecap({
@@ -184,6 +193,8 @@ export default function RecapSheet({ log, blocks }: Props) {
         energy:       get("energy") ? Number(get("energy")) : null,
         slotsDone,
         slotsSlipped: get("slipped") || undefined,
+        extra,
+        ...(tomorrowOn ? { tomorrowNote: get("tomorrow") } : {}),
       });
       if (res?.error) { setError(res.error); return; }
       setError(null);
@@ -221,7 +232,7 @@ export default function RecapSheet({ log, blocks }: Props) {
     () => [...fields].sort((a, b) => a.order - b.order).filter((f) => f.enabled),
     [fields],
   );
-  const hasLog     = !!log;
+  const hasLog     = isLogged(log);
   const summaryE   = log?.energy;
   const workBlocks = useMemo(
     () => blocks.filter(b => !["break", "buffer"].includes(b.kind)),
@@ -675,16 +686,22 @@ function FieldInput({
   }
 
   // "text" — short single-line
+  const isTomorrow = field.id === "tomorrow";
   return (
     <div>
-      <Label className={labelClass}>{field.label}</Label>
+      <Label className={labelClass}>{isTomorrow ? "Tomorrow →" : field.label}</Label>
       <Input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={`Add ${field.label.toLowerCase()}…`}
+        placeholder={isTomorrow ? "A note for tomorrow…" : `Add ${field.label.toLowerCase()}…`}
         className="mt-1.5 bg-transparent"
         style={glassB}
       />
+      {isTomorrow && (
+        <p className="mt-1 text-[0.6rem] text-muted-foreground/70">
+          Saved onto tomorrow — your morning planner reads it.
+        </p>
+      )}
     </div>
   );
 }

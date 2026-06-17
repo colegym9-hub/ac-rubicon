@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { saveRecapForDate } from "@/app/today/actions";
 import type { DailyLog } from "@/lib/database.types";
+import { isLogged } from "@/lib/day";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -64,7 +65,7 @@ export default function MorningCheckIn({ yesterday, yesterdayLog }: Props) {
   }
 
   if (!visible) return null;
-  const reviewing = !!yesterdayLog;
+  const reviewing = isLogged(yesterdayLog);
   const labelCls = "font-mono text-[0.6rem] uppercase tracking-[0.15em] text-muted-foreground";
 
   return (

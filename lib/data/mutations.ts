@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
+  addDaysISO,
   BLOCK_KINDS,
   type BlockKind,
   type DayBlock,
@@ -64,6 +65,12 @@ export async function writeRecap(
     energy?: number | null;
     slotsDone?: number | null;
     slotsSlipped?: string;
+    // Optional per-day log fields + block completion ({fields, blocks}); only
+    // touched when provided, so an MCP recap without it never clobbers UI extras.
+    extra?: Record<string, unknown> | null;
+    // The log's "Tomorrow" field: written onto *tomorrow's* row as plan_note.
+    // Only touched when provided; "" clears it. undefined leaves it alone.
+    tomorrowNote?: string | null;
   },
   date?: string, // defaults to today; pass an ISO date to log a past day (morning check-in)
 ): Promise<MutationResult> {
@@ -76,18 +83,45 @@ export async function writeRecap(
       ? null
       : Math.max(0, Math.round(Number(input.slotsDone)));
 
+  const day = date ?? todayISO();
   const supabase = createServiceClient();
-  const { error } = await supabase.from("daily_logs").upsert(
-    {
-      date: date ?? todayISO(),
-      recap_text: input.recap?.trim() || null,
-      energy,
-      slots_done: slotsDone,
-      slots_slipped: input.slotsSlipped?.trim() || null,
-    },
-    { onConflict: "date" },
-  );
-  return error ? { error: error.message } : {};
+
+  // The day's own row: recap columns (+ extra when provided). Listing only these
+  // columns means a separate plan_note write on the same row is never clobbered.
+  const row: {
+    date: string;
+    recap_text: string | null;
+    energy: number | null;
+    slots_done: number | null;
+    slots_slipped: string | null;
+    extra?: Record<string, unknown> | null;
+  } = {
+    date: day,
+    recap_text: input.recap?.trim() || null,
+    energy,
+    slots_done: slotsDone,
+    slots_slipped: input.slotsSlipped?.trim() || null,
+  };
+  if (input.extra !== undefined) row.extra = input.extra;
+
+  const { error } = await supabase
+    .from("daily_logs")
+    .upsert(row, { onConflict: "date" });
+  if (error) return { error: error.message };
+
+  // "Tomorrow" → tomorrow's plan_note. Separate upsert (only the date + plan_note
+  // columns) so it never disturbs tomorrow's own recap, and vice-versa.
+  if (input.tomorrowNote !== undefined) {
+    const { error: noteErr } = await supabase
+      .from("daily_logs")
+      .upsert(
+        { date: addDaysISO(day, 1), plan_note: input.tomorrowNote?.trim() || null },
+        { onConflict: "date" },
+      );
+    if (noteErr) return { error: noteErr.message };
+  }
+
+  return {};
 }
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────

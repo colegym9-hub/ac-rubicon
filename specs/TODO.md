@@ -18,6 +18,16 @@
 
 ---
 
+## Today log ↔ the day + "Tomorrow" link (2026-06-17) ✅
+
+The log's optional fields were floating in one global browser-localStorage blob (no date, invisible to MCP). Now everything is tied to the dated `daily_logs` row, and the "Tomorrow" field links to the next day so the morning planner can read it.
+
+- [x] Migration `0007_daily_plan_note.sql` — `daily_logs.plan_note` (text) + `extra` (jsonb). **Applied + verified on `kecpmrpugjfavdzxejxh`.**
+- [x] `writeRecap` now persists `extra` (mood/wins/gratitude/custom + per-block %/notes) on the day's row and write-forwards the "Tomorrow" field to **tomorrow's** `plan_note` (separate column-scoped upserts so neither clobbers the other).
+- [x] `getToday` returns `tomorrowNote` (seeds the field → idempotent edits); `getPlanningContext` returns `planNote` so the ~5am planner reads "the note left for today." MCP: `get_today` / `get_planning_context` expose it; `save_recap` gained `tomorrowNote`.
+- [x] Shared `addDaysISO` + `isLogged` in `lib/day.ts` (`isLogged` stops a forward-note-only row from counting as "logged" in the morning check-in). RecapSheet reads/writes the dated row instead of localStorage; "Tomorrow" on by default with a hint; Today shows a "Note for today" card.
+- [x] Verified end-to-end against the live DB via the preview: write-forward → `daily_logs[tomorrow].plan_note`, read-back re-seeds the field, clear writes null. Today's real recap untouched; no console errors.
+
 ## Brain — saved conversations (in progress 2026-06-16)
 
 Threads for "Ask your brain": each chat turn now belongs to a `brain_conversations` row, so the panel can list/reopen past threads and the model gets prior-turn memory on follow-ups.
