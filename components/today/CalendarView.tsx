@@ -144,6 +144,15 @@ export default function CalendarView({ initialDate, initialBlocks }: Props) {
   useEffect(() => { pxRef.current = pxPerHour; },      [pxPerHour]);
   useEffect(() => { dragVisualRef.current = dragVisual; }, [dragVisual]);
 
+  // Re-sync from the server when it sends fresh blocks for the initial date —
+  // e.g. "Re-plan from now" saves a new plan then calls router.refresh(). `blocks`
+  // is seeded once at mount, so without this the refreshed prop is ignored and the
+  // timeline keeps showing the pre-replan plan. Guard on the date so viewing
+  // another day isn't clobbered by today's blocks.
+  useEffect(() => {
+    if (selectedDate === initialDate) setBlocks(sortBlocks(initialBlocks));
+  }, [initialBlocks, initialDate, selectedDate]);
+
   // Cleanup window listeners on unmount (in case a drag is in progress)
   useEffect(() => () => { cleanupRef.current?.(); }, []);
 
