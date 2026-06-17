@@ -90,25 +90,6 @@ export async function writeRecap(
   return error ? { error: error.message } : {};
 }
 
-/** Queue a "re-plan from now" request for the brain routine to act on.
- *  Returns the new row id so the UI can poll it. */
-export async function writeReplanRequest(input: {
-  whatChanged?: string | null;
-  timeLeft?: string | null;
-}): Promise<MutationResult & { id?: string }> {
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from("replan_requests")
-    .insert({
-      plan_date: todayISO(),
-      what_changed: input.whatChanged?.trim() || null,
-      time_left: input.timeLeft?.trim() || null,
-    })
-    .select("id")
-    .single();
-  return error ? { error: error.message } : { id: data.id };
-}
-
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 
 export async function insertTask(input: {

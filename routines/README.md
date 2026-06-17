@@ -7,8 +7,7 @@ Claude Code routines that drive the app through its MCP server (`/api/mcp`).
 > API**, not as routines — see `lib/brain/{ingest,replan}.ts` + `app/api/brain/chat`.
 > The only routines you still register as crons are the **daily planner**
 > (`plan-my-day.md` / `daily.md`) and the **weekly lint + insight** (`weekly.md`).
-> `process-brain.md`, `replan-day.md`, and `brain-chat.md` are kept for reference
-> but are superseded by the in-app calls.
+> `brain-chat.md` is kept for reference but is superseded by the in-app call.
 
 ## `plan-my-day.md` — the daily scheduler
 

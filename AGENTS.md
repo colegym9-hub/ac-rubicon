@@ -14,7 +14,7 @@
 /lib                  — supabase client, data layer, mcp tools, day helpers
 /lib/brain            — brain helpers (wiki full-text search, capture types, save actions)
 /supabase/migrations  — DB schema (projects, tasks, tracking_*, daily_logs, daily_plans, brain tables)
-/routines             — Claude Code routine prompts (planner, brain ingest, chat, weekly) — editable .md
+/routines             — Claude Code routine prompts (planner, chat, weekly) — editable .md
 /public               — PWA manifest + icons
 ```
 
@@ -52,8 +52,6 @@ MCP_BEARER_TOKEN=                # auth for the app MCP server at /api/[transpor
 SUPADATA_API_KEY=                # transcripts: YouTube / Instagram / TikTok / X / Facebook / file URLs (free tier)
 DEEPGRAM_API_KEY=                # voice-memo transcription (free tier)
 ANTHROPIC_API_KEY=               # in-app AI: brain chat (streaming) + ingest + re-plan on the Anthropic API
-# Legacy — no longer used (ingest + re-plan moved in-app 2026-06-16; chat was already in-app). Safe to omit:
-#   BRAIN_PROCESS_FIRE_URL / BRAIN_PROCESS_TOKEN, BRAIN_CHAT_FIRE_URL / BRAIN_CHAT_TOKEN, BRAIN_REPLAN_FIRE_URL / BRAIN_REPLAN_TOKEN
 ```
 
 **AI split:** interactive AI (brain chat / ingest / re-plan) runs **in-app on `ANTHROPIC_API_KEY`**
@@ -93,7 +91,7 @@ Lift verbatim from `design/globals.css` (copied into this repo from the old Elec
 ## Third-Party Services
 
 - **Supabase** — Postgres (source of truth, incl. the brain), single-user access via the service-role key; **no edge functions** (routines do the AI work).
-- **Claude Code routines** — the AI runtime for planning, brain ingest, chat, re-plan, and weekly lint/insight. Fired by the app (a wakeup; the request lives in a Supabase table) or scheduled. Run on Cole's subscription — **no `ANTHROPIC_API_KEY`**. Prompts live in `/routines/*.md`, editable.
+- **Claude Code routines** — the AI runtime for the **scheduled** work: the daily planner and the weekly lint/insight. Scheduled as crons that call the app's MCP server (`/api/mcp`) with `MCP_BEARER_TOKEN`; they run on Cole's subscription — **no `ANTHROPIC_API_KEY`**. Prompts live in `/routines/*.md`, editable. (On-demand brain ingest / chat / re-plan moved in-app to the Anthropic API — see the AI split above.)
 - **Supadata** — transcript extraction for links/video (YouTube, Instagram, TikTok, X, Facebook, file URLs). Async (may return a job id to poll) — handled inside the routine.
 - **Deepgram** — voice-memo transcription. Images/handwriting are read by Claude vision inside the routine.
 - **Google Calendar MCP** — read events, write the day's blocks.
