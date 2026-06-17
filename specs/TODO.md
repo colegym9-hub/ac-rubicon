@@ -14,7 +14,7 @@
 - **Post-B4 (B5) shipped:** CloudMD SOP editor, project notes, ingest debounce lock, and a brain-chat rewrite to the **direct Anthropic SDK with streaming** (`@anthropic-ai/sdk`).
 - **On-demand AI → direct API (2026-06-16):** brain **ingest** (`lib/brain/ingest.ts`) and **re-plan** (`lib/brain/replan.ts`) now run in-app on the Anthropic API like chat — no cloud-routine round-trip. Ingest fires from `POST /api/brain/captures` via `after()` (lock-guarded), backstopped by `POST /api/brain/ingest`; re-plan is `POST /api/today/replan`. Only the **daily planner** + **weekly** routines remain crons. Shared extractions: `lib/brain/convert.ts`, `lib/data/brain-mutations.ts` (MCP `brain-tools.ts` now delegates to these). Now removed (cleanup): `lib/brain/routine.ts` + `writeReplanRequest` + the `BRAIN_*_FIRE_URL/TOKEN` env-var docs + the `process-brain`/`replan-day` routine files.
 - **In progress (uncommitted):** responsive sheet polish — desktop sidebar offset + slide-up animation across the bottom sheets; Markdown renderer memoized.
-- **Still pending (human-only):** Vercel deploy + PWA PNG icons; registering the **daily + weekly** routines as crons; WHOOP/GCal wiring.
+- **Still pending (human-only):** PWA PNG icons; registering the **daily + weekly** routines as crons; WHOOP/GCal wiring. (Vercel deploy-wiring **resolved 2026-06-17** — code now deploys via the `vercel` remote; see the DEPLOY block below.)
 
 ---
 
@@ -184,7 +184,7 @@ From the deep study in `research/linear-study.md` (lens: steal Linear's best ide
 
 ### Open
 - [ ] **NEEDS ME — DEPLOY (human-only).** Everything cloud-side waits on this:
-  1. **Wire the deploy to the right repo first.** The Vercel project `ac-rubicon-vercel` is connected to a *separate, near-empty* GitHub repo (`colegym9-hub/ac-rubicon-vercel` — only the `vercel.com/new` starter commit), **not** this repo (`colegym9-hub/ac-rubicon`). So `git push origin` here does **not** deploy the app (confirmed 2026-06-16: every Vercel deployment is a redeploy of that one starter commit). Fix: either (a) repoint the Vercel project at `colegym9-hub/ac-rubicon` in the dashboard, or (b) push this code to the `ac-rubicon-vercel` repo. Then deploy `main` → production (after the M0 hardening + env vars below). Add PNG PWA icons 192/512 + login rate-limiting first (M0 hardening).
+  1. ~~Wire the deploy to the right repo first.~~ **RESOLVED 2026-06-17** — took option (b): this code now lives on the `vercel` remote (`colegym9-hub/ac-rubicon-vercel`), and pushing `main` there triggers the production deploy. `main` / `feature/m0-foundation` / `fix/calendar-sync` were unified at the latest commit and pushed to both `origin` (github) and `vercel` (deploy). Still recommended before the next deploy: PNG PWA icons 192/512 + login rate-limiting (M0 hardening) — shipped as-is for now.
   2. Add Brain env vars to Vercel: `SUPADATA_API_KEY`, `DEEPGRAM_API_KEY`, `ANTHROPIC_API_KEY` (powers the in-app chat / ingest / re-plan), and `MCP_BEARER_TOKEN` (for the scheduled routines). The `BRAIN_*_FIRE_URL` / `BRAIN_*_TOKEN` vars are no longer needed — ingest + re-plan run in-app now.
   3. In the Claude console, create only the **scheduled** routines by pasting `routines/daily.md` (or `routines/plan-my-day.md`) and `routines/weekly.md` — connect the ac-rubicon MCP to each. (`process-brain.md`, `replan-day.md`, `brain-chat.md` are now in-app on the Anthropic API — no cron.)
   4. First-run test: drop a YouTube-link capture, confirm the routine fires and status goes `pending → processing → done` and the wiki page appears.
@@ -198,7 +198,7 @@ From the deep study in `research/linear-study.md` (lens: steal Linear's best ide
 - [x] ~~Confirm auth/RLS model.~~ **RESOLVED** — server-side service-role access, RLS deny-by-default, browser holds no Supabase client.
 - [x] ~~M2 architecture fork.~~ **DECIDED** — Claude Code scheduled routine + app MCP server.
 - [x] ~~Approve `react-markdown` + `rehype-sanitize`.~~ **RESOLVED — not needed.** Built a custom `lib/brain/Markdown.tsx` renderer instead (zero new deps for markdown; `@anthropic-ai/sdk` is the one Brain dependency added, for chat streaming).
-- [ ] **NEEDS ME: GitHub push** (you chose "set up, leave push to me"). Create the private repo and push `feature/m0-foundation` when ready.
+- [x] ~~**NEEDS ME: GitHub push**~~ **DONE 2026-06-17** — `feature/m0-foundation` + `main` pushed to `origin` (`colegym9-hub/ac-rubicon`) and `vercel` (`colegym9-hub/ac-rubicon-vercel`).
 
 ---
 
