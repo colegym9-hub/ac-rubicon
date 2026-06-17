@@ -70,8 +70,8 @@ export default function MorningCheckIn({ yesterday, yesterdayLog }: Props) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:items-center md:pl-52">
       <div
-        className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border bg-card p-5 pb-8 shadow-2xl md:rounded-2xl animate-slide-up"
-        style={{ borderColor: "var(--glass-border)" }}
+        className="relative max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border bg-card p-5 shadow-2xl md:rounded-2xl animate-slide-up"
+        style={{ borderColor: "var(--glass-border)", paddingBottom: "calc(2rem + env(safe-area-inset-bottom, 0px))" }}
       >
         <button type="button" onClick={dismiss} aria-label="Dismiss" className="absolute right-4 top-4 text-muted-foreground transition-colors hover:text-foreground">
           <X className="h-5 w-5" />

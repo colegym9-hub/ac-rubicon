@@ -8,6 +8,10 @@ import type {
   WikiSummary,
   WikiDetail,
   SourceEntry,
+  SourceWithStatus,
+  PageWithSources,
+  PendingSource,
+  SourcesByPageResult,
   ChatTurn,
   ConversationSummary,
   ConversationDetail,
@@ -74,6 +78,79 @@ export async function getCaptureStatus(
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ?? null;
+}
+
+// ── Sources by page ─────────────────────────────────────────────────────────
+
+export async function getSourcesByPage(): Promise<SourcesByPageResult> {
+  if (!isSupabaseConfigured()) return { groups: [], pending: [] };
+  const supabase = createServiceClient();
+
+  // All active wiki pages (lightweight — no content)
+  const { data: pages, error: pErr } = await supabase
+    .from("wiki_pages")
+    .select("id, slug, title, domain")
+    .eq("status", "active")
+    .order("title");
+  if (pErr) throw new Error(pErr.message);
+
+  // All source↔page junction rows
+  const { data: links, error: lErr } = await supabase
+    .from("raw_source_wiki_pages")
+    .select("page_id, source_id");
+  if (lErr) throw new Error(lErr.message);
+
+  // Fetch metadata for every linked source
+  const sourceIds = [...new Set((links ?? []).map((l) => l.source_id))];
+  const sourceMap = new Map<string, SourceWithStatus>();
+  if (sourceIds.length) {
+    const { data: srcs, error: sErr } = await supabase
+      .from("raw_sources")
+      .select("id, type, title, created_at, status")
+      .in("id", sourceIds)
+      .order("created_at", { ascending: false });
+    if (sErr) throw new Error(sErr.message);
+    for (const s of srcs ?? []) sourceMap.set(s.id, s as SourceWithStatus);
+  }
+
+  // Build page → sources index
+  const pageSourceIds: Record<string, string[]> = {};
+  for (const l of links ?? []) {
+    if (!pageSourceIds[l.page_id]) pageSourceIds[l.page_id] = [];
+    pageSourceIds[l.page_id].push(l.source_id);
+  }
+
+  // Group pages by domain
+  const groupMap = new Map<string, PageWithSources[]>();
+  for (const p of pages ?? []) {
+    const sources = (pageSourceIds[p.id] ?? [])
+      .map((sid) => sourceMap.get(sid))
+      .filter((s): s is SourceWithStatus => !!s);
+    if (!groupMap.has(p.domain)) groupMap.set(p.domain, []);
+    groupMap.get(p.domain)!.push({ ...p, sources });
+  }
+
+  const rank = (d: string) => {
+    const i = DOMAIN_ORDER.indexOf(d);
+    return i === -1 ? DOMAIN_ORDER.length : i;
+  };
+  const groups = [...groupMap.entries()]
+    .sort((a, b) => rank(a[0]) - rank(b[0]))
+    .map(([domain, ps]) => ({
+      domain,
+      pages: ps.sort((a, b) => b.sources.length - a.sources.length),
+    }));
+
+  // Pending: non-ingested, non-migrated (include content for review)
+  const { data: pendingRows, error: pendErr } = await supabase
+    .from("raw_sources")
+    .select("id, type, title, status, error_msg, raw_input, content_md, created_at")
+    .not("status", "eq", "ingested")
+    .not("tags", "cs", "{migrated}")
+    .order("created_at", { ascending: false });
+  if (pendErr) throw new Error(pendErr.message);
+
+  return { groups, pending: (pendingRows ?? []) as PendingSource[] };
 }
 
 // ── Wiki ────────────────────────────────────────────────────────────────────

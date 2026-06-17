@@ -447,7 +447,7 @@ function LogForm({
       )}
 
       {/* Footer */}
-      <div className="shrink-0 px-4 pb-6 pt-2">
+      <div className="shrink-0 px-4 pt-2" style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}>
         {saved && (
           <p className="mb-1.5 text-center font-mono text-[0.6rem] uppercase tracking-[0.15em] text-primary">
             saved ✓

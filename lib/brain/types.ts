@@ -1,5 +1,6 @@
 import type { RawSourceType, RawSourceStatus, WikiStatus } from "@/lib/database.types";
 
+
 // View-models for the Brain surface (server data layer → components).
 
 export type CaptureSummary = {
@@ -60,6 +61,37 @@ export type ChatTurn = {
   citations: { slug: string; title: string }[];
   error_msg: string | null;
 };
+
+// ── Sources-by-page view ────────────────────────────────────────────────────
+
+export type SourceWithStatus = SourceEntry & { status: RawSourceStatus };
+
+export type PageWithSources = {
+  id: string;
+  slug: string;
+  title: string;
+  domain: string;
+  sources: SourceWithStatus[];
+};
+
+/** A raw_source row with enough detail for the pending-review panel. */
+export type PendingSource = {
+  id: string;
+  type: RawSourceType;
+  title: string | null;
+  status: RawSourceStatus;
+  error_msg: string | null;
+  raw_input: string | null;
+  content_md: string | null;
+  created_at: string;
+};
+
+export type SourcesByPageResult = {
+  groups: { domain: string; pages: PageWithSources[] }[];
+  pending: PendingSource[];
+};
+
+// ── Conversations ────────────────────────────────────────────────────────────
 
 // A saved chat thread (many ChatTurns). Listed in the history panel and
 // reopened to continue with follow-up memory.

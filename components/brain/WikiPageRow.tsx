@@ -13,7 +13,7 @@ export default function WikiPageRow({ page }: { page: WikiSummary }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{page.title}</span>
         {page.overview && (
-          <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">{page.overview}</span>
+          <span className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{page.overview}</span>
         )}
       </span>
     </Link>

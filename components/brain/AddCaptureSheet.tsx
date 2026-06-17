@@ -52,8 +52,8 @@ export default function AddCaptureSheet({ onClose, onAdded }: Props) {
     <>
       <div className="fixed inset-0 md:left-52 z-[60] bg-black/50" onClick={onClose} />
       <div
-        className="fixed left-0 md:left-52 right-0 bottom-0 z-[70] rounded-t-2xl border-t bg-card px-5 pt-4 pb-10 shadow-2xl animate-slide-up"
-        style={border}
+        className="fixed left-0 md:left-52 right-0 bottom-0 z-[70] rounded-t-2xl border-t bg-card px-5 pt-4 shadow-2xl animate-slide-up"
+        style={{ ...border, paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom, 0px))" }}
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
         <h2 className="text-xl font-extrabold leading-tight">

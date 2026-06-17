@@ -51,7 +51,7 @@ export default function CapturesSection({ captures, onRefresh, onAdd }: Props) {
         </p>
       ) : (
         <div className="flex flex-col gap-1.5">
-          {captures.map((c) => <CaptureRow key={c.id} capture={c} />)}
+          {captures.map((c) => <CaptureRow key={c.id} capture={c} onRetried={onRefresh} />)}
         </div>
       )}
     </section>
