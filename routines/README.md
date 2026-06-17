@@ -85,6 +85,9 @@ Needs the app **deployed to Vercel** so the cloud can reach `/api/mcp`:
       "type": "http",
       "url": "https://<your-app>.vercel.app/api/mcp",   // or http://localhost:3001/api/mcp
       "headers": { "Authorization": "Bearer <MCP_BEARER_TOKEN>" }
+    },
+    "google-calendar": {
+      // your Google Calendar MCP server — the daily routine reads + writes the primary calendar
     }
   }
 }
@@ -92,20 +95,23 @@ Needs the app **deployed to Vercel** so the cloud can reach `/api/mcp`:
 
 ---
 
-## Adding WHOOP + Google Calendar (next iteration)
+## Google Calendar (wired) + WHOOP (next)
 
-Per your plan, a follow-up wires these into the **same routine**, daily:
+**Google Calendar is now part of the daily routine.** It reads your **primary**
+calendar for fixed events (planned around as `kind: "event"` blocks) and writes the
+finished plan back as `[acr-plan]`-tagged events. Rules live in `get_sop("daily")` →
+"Google Calendar"; the steps are `daily.md` steps 6 (read) + 11 (write). To run it:
 
-1. Add the WHOOP and Google Calendar MCP servers to the routine's MCP config
-   (alongside `ac-rubicon`).
-2. Uncomment/extend the "Later" section of `plan-my-day.md`: read WHOOP recovery
-   (scale deep-work load to it) and today's calendar events (place as fixed
-   `kind: "event"` blocks, plan around them).
-3. **Verify availability first:** a headless cloud run may not inherit
-   interactively-OAuth'd MCPs. If the cloud run can't reach WHOOP/Calendar, either
-   run the routine locally (where they're authed) or add server-side REST
-   integrations in the app. The `ac-rubicon` MCP itself is unaffected — it's
-   token-auth over HTTPS and reachable from any runtime.
+1. Add the Google Calendar MCP server to the routine's MCP config (alongside
+   `ac-rubicon` — see the config block above).
+2. **Verify availability first:** a headless cloud run may not inherit an
+   interactively-OAuth'd Calendar MCP. If the cloud run can't reach Calendar, run the
+   routine where it's authed (locally), or add a server-side Calendar integration in
+   the app. The routine degrades gracefully — no calendar = it still plans and saves;
+   the `ac-rubicon` MCP is unaffected (token-auth over HTTPS, reachable anywhere).
+
+**WHOOP is still a TODO:** add the WHOOP MCP to the config and extend `get_sop("daily")`
+to read recovery (scale deep-work load to it). Same headless-auth caveat applies.
 
 ## Security
 
